@@ -48,11 +48,11 @@ success "All prerequisites met"
 # Get project configuration
 REGION="${REGION:-nyc3}"
 PROJECT_NAME="bidfetch"
-REGISTRY_NAME="${PROJECT_NAME}-registry"
+REGISTRY_NAME="bishop"
 DB_NAME="${PROJECT_NAME}-db"
 REDIS_NAME="${PROJECT_NAME}-redis"
 SPACES_BUCKET="${PROJECT_NAME}-documents"
-K8S_CLUSTER="${PROJECT_NAME}-k8s"
+K8S_CLUSTER="bidfetch-prod-k8s-$(date +%s)"
 
 log "🏗️  Creating DigitalOcean infrastructure..."
 
@@ -66,7 +66,7 @@ else
 fi
 
 # Get registry endpoint
-REGISTRY_ENDPOINT=$(doctl registry get --output json | jq -r '.endpoint')
+REGISTRY_ENDPOINT="registry.digitalocean.com/$REGISTRY_NAME"
 log "Registry endpoint: $REGISTRY_ENDPOINT"
 
 # Login to registry

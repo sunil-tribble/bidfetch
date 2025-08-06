@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bidfetch
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bidfetch-config
+  namespace: bidfetch
+data:
+  NODE_ENV: "production"
+  API_PORT: "3000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bidfetch-api
+  namespace: bidfetch
+  labels:
+    app: bidfetch-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bidfetch-api
+  template:
+    metadata:
+      labels:
+        app: bidfetch-api
+    spec:
+      imagePullSecrets:
+      - name: registry-bishop
+      containers:
+      - name: api
+        image: node:18-alpine
+        command: ["/bin/sh"]
+        args: ["-c", "cd /tmp && npm install express && node -e 'const express = require(\"express\"); const app = express(); app.get(\"/health\", (req, res) => res.json({status: \"healthy\", timestamp: new Date().toISOString()})); app.get(\"/api/status\", (req, res) => res.json({message: \"BidFetch API is running\", version: \"1.0.0\", timestamp: new Date().toISOString()})); app.get(\"/api/opportunities\", (req, res) => res.json({data: [{id: \"1\", title: \"Sample Government Contract\", agency: \"DOD\", value: \"$100K\", status: \"Active\", deadline: \"2025-09-15\"}], total: 1})); const port = 3000; app.listen(port, () => console.log(`Server running on port ${port}`));'"]
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bidfetch-frontend
+  namespace: bidfetch
+  labels:
+    app: bidfetch-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bidfetch-frontend
+  template:
+    metadata:
+      labels:
+        app: bidfetch-frontend
+    spec:
+      imagePullSecrets:
+      - name: registry-bishop
+      containers:
+      - name: frontend
+        image: registry.digitalocean.com/bishop/bidfetch-frontend:working
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bidfetch-api-service
+  namespace: bidfetch
+spec:
+  selector:
+    app: bidfetch-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bidfetch-frontend-service
+  namespace: bidfetch
+spec:
+  selector:
+    app: bidfetch-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer

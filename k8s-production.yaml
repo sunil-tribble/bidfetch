@@ -60,7 +60,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: registry.digitalocean.com/bidfetch-registry/bidfetch-api:latest
+        image: registry.digitalocean.com/bishop/bidfetch-api:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
@@ -161,7 +161,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: registry.digitalocean.com/bidfetch-registry/bidfetch-frontend:latest
+        image: registry.digitalocean.com/bishop/bidfetch-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80
@@ -216,7 +216,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: registry.digitalocean.com/bidfetch-registry/bidfetch-api:latest
+        image: registry.digitalocean.com/bishop/bidfetch-api:latest
         imagePullPolicy: Always
         command: ["node", "dist/workers/index.js"]
         env:
@@ -321,7 +321,7 @@ spec:
         spec:
           containers:
           - name: sam-ingester
-            image: registry.digitalocean.com/bidfetch-registry/bidfetch-api:latest
+            image: registry.digitalocean.com/bishop/bidfetch-api:latest
             command: ["node", "dist/services/sources/sam-gov/index.js"]
             env:
             - name: NODE_ENV
@@ -369,7 +369,7 @@ spec:
         spec:
           containers:
           - name: grants-ingester
-            image: registry.digitalocean.com/bidfetch-registry/bidfetch-api:latest
+            image: registry.digitalocean.com/bishop/bidfetch-api:latest
             command: ["node", "dist/services/sources/grants-gov/index.js"]
             env:
             - name: NODE_ENV
@@ -412,7 +412,7 @@ spec:
         spec:
           containers:
           - name: fpds-ingester
-            image: registry.digitalocean.com/bidfetch-registry/bidfetch-api:latest
+            image: registry.digitalocean.com/bishop/bidfetch-api:latest
             command: ["node", "dist/services/sources/fpds/index.js"]
             env:
             - name: NODE_ENV
