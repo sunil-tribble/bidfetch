@@ -7,8 +7,24 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors());
+// Set NODE_ENV if not specified
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'development';
+}
+
+console.log(`Starting in ${process.env.NODE_ENV} mode...`);
+
+// Middleware - Configure CORS for production
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' ? [
+    'http://152.42.154.129',
+    'http://152.42.154.129:3001',
+    'https://152.42.154.129'
+  ] : true,
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Cache for API data
@@ -1927,16 +1943,25 @@ setInterval(() => {
 }, 60 * 60 * 1000); // 1 hour
 
 // Serve static files from frontend build if available
-const frontendPath = path.join(__dirname, '../frontend/dist');
+const frontendPath = path.join(__dirname, '../frontend/build');
 if (fs.existsSync(frontendPath)) {
+  console.log(`Serving frontend build from: ${frontendPath}`);
   app.use(express.static(frontendPath));
   
   // Catch-all handler for SPA routing
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api/')) {
-      res.sendFile(path.join(frontendPath, 'index.html'));
+    if (!req.path.startsWith('/api/') && !req.path.startsWith('/health')) {
+      const indexPath = path.join(frontendPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).json({ error: 'Frontend build not found' });
+      }
     }
   });
+} else {
+  console.warn(`Frontend build directory not found: ${frontendPath}`);
+  console.warn('Run "npm run build:frontend" to build the frontend');
 }
 
 // Start server

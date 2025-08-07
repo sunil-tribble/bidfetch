@@ -51,23 +51,23 @@ const SearchBar: React.FC<SearchBarProps> = ({
     const timeoutId = setTimeout(async () => {
       try {
         // Mock API call - replace with actual search API
-        const mockSuggestions: SearchSuggestion[] = [
+        const mockSuggestions = [
           {
             id: '1',
             title: 'IT Infrastructure Modernization',
-            type: 'opportunity',
+            type: 'opportunity' as const,
             value: 'IT Infrastructure Modernization'
           },
           {
             id: '2',
             title: 'Department of Veterans Affairs',
-            type: 'agency',
+            type: 'agency' as const,
             value: 'Department of Veterans Affairs'
           },
           {
             id: '3',
             title: 'Cloud Services',
-            type: 'keyword',
+            type: 'keyword' as const,
             value: 'Cloud Services'
           }
         ].filter(item => 

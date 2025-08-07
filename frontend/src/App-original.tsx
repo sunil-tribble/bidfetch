@@ -29,16 +29,16 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Layout />}>
+            <Route path="/" element={<Layout><Navigate to="/dashboard" replace /></Layout>}>
               <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="opportunities" element={<Opportunities />} />
-              <Route path="opportunities/:id" element={<OpportunityDetail />} />
-              <Route path="contracts" element={<Contracts />} />
-              <Route path="intelligence" element={<Intelligence />} />
-              <Route path="watchlists" element={<Watchlists />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="settings" element={<Settings />} />
+              <Route path="dashboard" element={<Layout><Dashboard /></Layout>} />
+              <Route path="opportunities" element={<Layout><Opportunities /></Layout>} />
+              <Route path="opportunities/:id" element={<Layout><OpportunityDetail /></Layout>} />
+              <Route path="contracts" element={<Layout><Contracts /></Layout>} />
+              <Route path="intelligence" element={<Layout><Intelligence /></Layout>} />
+              <Route path="watchlists" element={<Layout><Watchlists /></Layout>} />
+              <Route path="analytics" element={<Layout><Analytics /></Layout>} />
+              <Route path="settings" element={<Layout><Settings /></Layout>} />
             </Route>
           </Routes>
         </Router>

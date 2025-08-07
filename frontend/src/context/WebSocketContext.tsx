@@ -69,29 +69,23 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           switch (message.type) {
             case 'new_opportunity':
               addNotification({
-                id: Date.now().toString(),
                 type: 'info',
                 title: 'New Opportunity',
-                message: `${message.data.title} has been added`,
-                timestamp: new Date()
+                message: `${message.data.title} has been added`
               });
               break;
             case 'document_ready':
               addNotification({
-                id: Date.now().toString(),
                 type: 'success',
                 title: 'Document Ready',
-                message: `Document ${message.data.filename} is now available`,
-                timestamp: new Date()
+                message: `Document ${message.data.filename} is now available`
               });
               break;
             case 'error':
               addNotification({
-                id: Date.now().toString(),
                 type: 'error',
                 title: 'System Error',
-                message: message.data.message,
-                timestamp: new Date()
+                message: message.data.message
               });
               break;
           }

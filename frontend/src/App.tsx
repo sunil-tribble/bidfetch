@@ -36,19 +36,15 @@ function App() {
           <NotificationProvider>
             <WebSocketProvider>
               <Router>
-                <div className="min-h-screen bg-gray-50">
-                  <Layout>
-                    <Routes>
-                      <Route path="/" element={<Home />} />
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/search" element={<Search />} />
-                      <Route path="/opportunity/:id" element={<OpportunityDetail />} />
-                      <Route path="/analytics" element={<Analytics />} />
-                      <Route path="/intelligence" element={<Intelligence />} />
-                      <Route path="/settings" element={<Settings />} />
-                    </Routes>
-                  </Layout>
-                </div>
+                <Routes>
+                  <Route path="/" element={<Layout><Home /></Layout>} />
+                  <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+                  <Route path="/search" element={<Layout><Search /></Layout>} />
+                  <Route path="/opportunity/:id" element={<Layout><OpportunityDetail /></Layout>} />
+                  <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
+                  <Route path="/intelligence" element={<Layout><Intelligence /></Layout>} />
+                  <Route path="/settings" element={<Layout><Settings /></Layout>} />
+                </Routes>
               </Router>
             </WebSocketProvider>
           </NotificationProvider>

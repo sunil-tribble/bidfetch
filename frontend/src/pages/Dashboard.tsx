@@ -63,6 +63,16 @@ const Dashboard: React.FC = () => {
   const { status, subscribe } = useWebSocket();
   const { addNotification } = useNotifications();
 
+  // Helper function to format currency
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
   // Fetch dashboard stats
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery<OpportunityStats>({
     queryKey: ['dashboard-stats', selectedTimeRange],
@@ -519,25 +529,25 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div>
               <div className="text-2xl font-bold text-gray-800">
-                {analyticsStats?.summary.total_opportunities.toLocaleString() || '0'}
+                {stats?.total.toLocaleString() || '0'}
               </div>
               <div className="text-gray-600 text-sm mt-1">Total Opportunities</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-800">
-                {formatCurrency(analyticsStats?.summary.total_value || 0)}
+                {formatCurrency(stats?.total_value || 0)}
               </div>
               <div className="text-gray-600 text-sm mt-1">Total Value</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-800">
-                {formatCurrency(analyticsStats?.summary.avg_value || 0)}
+                {formatCurrency((stats?.total_value || 0) / (stats?.total || 1))}
               </div>
               <div className="text-gray-600 text-sm mt-1">Average Value</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-800">
-                {analyticsStats?.summary.active_sources || 0}
+                {stats?.sources_active || 0}
               </div>
               <div className="text-gray-600 text-sm mt-1">Active Sources</div>
             </div>

@@ -640,7 +640,7 @@ const Search: React.FC = () => {
                     Data Sources
                   </h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {displayFilterOptions.sources.map((source) => (
+                    {displayFilterOptions.sources.map((source: string) => (
                       <label key={source} className="flex items-center text-sm">
                         <input
                           type="checkbox"
@@ -661,7 +661,7 @@ const Search: React.FC = () => {
                     Agencies
                   </h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {displayFilterOptions.agencies.map((agency) => (
+                    {displayFilterOptions.agencies.map((agency: string) => (
                       <label key={agency} className="flex items-center text-sm">
                         <input
                           type="checkbox"
@@ -712,7 +712,7 @@ const Search: React.FC = () => {
                     Set-Aside Types
                   </h4>
                   <div className="space-y-2">
-                    {displayFilterOptions.setAsideTypes.map((type) => (
+                    {displayFilterOptions.setAsideTypes.map((type: string) => (
                       <label key={type} className="flex items-center text-sm">
                         <input
                           type="checkbox"
@@ -770,7 +770,7 @@ const Search: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {displayResults.data.map((opportunity) => (
+                  {displayResults.data.map((opportunity: any) => (
                     <div 
                       key={opportunity.id} 
                       className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-6"
@@ -833,7 +833,7 @@ const Search: React.FC = () => {
 
                           {/* Tags */}
                           <div className="flex items-center flex-wrap gap-2 mb-4">
-                            {opportunity.naics_codes.slice(0, 2).map((code) => (
+                            {opportunity.naics_codes.slice(0, 2).map((code: string) => (
                               <span key={code} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
                                 NAICS {code}
                               </span>
@@ -859,7 +859,7 @@ const Search: React.FC = () => {
                                 <div className="min-w-0 flex-1">
                                   <span className="text-sm font-medium text-gray-600">Documents:</span>
                                   <div className="flex items-center flex-wrap gap-2 mt-1">
-                                    {opportunity.documents.slice(0, 3).map((doc, i) => (
+                                    {opportunity.documents.slice(0, 3).map((doc: any, i: number) => (
                                       <div key={i} className="flex items-center space-x-1 px-2 py-1 bg-gray-50 rounded text-xs">
                                         {getFileIcon(doc.type)}
                                         <span className="text-gray-700 truncate max-w-32" title={doc.name}>
@@ -989,7 +989,7 @@ const Search: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {displayResults.data.map((opportunity) => (
+                {displayResults.data.map((opportunity: any) => (
                   <div 
                     key={opportunity.id} 
                     className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-6"
@@ -1052,7 +1052,7 @@ const Search: React.FC = () => {
 
                         {/* Tags */}
                         <div className="flex items-center flex-wrap gap-2 mb-4">
-                          {opportunity.naics_codes.slice(0, 2).map((code) => (
+                          {opportunity.naics_codes.slice(0, 2).map((code: string) => (
                             <span key={code} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
                               NAICS {code}
                             </span>
@@ -1078,7 +1078,7 @@ const Search: React.FC = () => {
                               <div className="min-w-0 flex-1">
                                 <span className="text-sm font-medium text-gray-600">Documents:</span>
                                 <div className="flex items-center flex-wrap gap-2 mt-1">
-                                  {opportunity.documents.slice(0, 3).map((doc, i) => (
+                                  {opportunity.documents.slice(0, 3).map((doc: any, i: number) => (
                                     <div key={i} className="flex items-center space-x-1 px-2 py-1 bg-gray-50 rounded text-xs">
                                       {getFileIcon(doc.type)}
                                       <span className="text-gray-700 truncate max-w-32" title={doc.name}>
