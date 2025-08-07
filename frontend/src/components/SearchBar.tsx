@@ -1,1 +1,267 @@
-import React, { useState, useRef, useEffect } from 'react';\nimport { Search, Filter, X, Clock, TrendingUp, Building } from 'lucide-react';\nimport { useNavigate } from 'react-router-dom';\n\ninterface SearchSuggestion {\n  id: string;\n  title: string;\n  type: 'opportunity' | 'agency' | 'keyword';\n  value: string;\n}\n\ninterface SearchBarProps {\n  placeholder?: string;\n  onSearch?: (query: string) => void;\n}\n\nconst SearchBar: React.FC<SearchBarProps> = ({ \n  placeholder = \"Search opportunities, agencies, keywords...\", \n  onSearch \n}) => {\n  const [query, setQuery] = useState('');\n  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);\n  const [showSuggestions, setShowSuggestions] = useState(false);\n  const [isLoading, setIsLoading] = useState(false);\n  const searchRef = useRef<HTMLDivElement>(null);\n  const navigate = useNavigate();\n\n  // Mock recent searches and trending\n  const recentSearches = [\n    'IT Services',\n    'Construction',\n    'Department of Defense',\n    'Software Development'\n  ];\n\n  const trendingKeywords = [\n    'Cybersecurity',\n    'Cloud Computing',\n    'AI/ML Services',\n    'Green Energy'\n  ];\n\n  // Debounced search function\n  useEffect(() => {\n    if (query.length < 2) {\n      setSuggestions([]);\n      return;\n    }\n\n    setIsLoading(true);\n    const timeoutId = setTimeout(async () => {\n      try {\n        // Mock API call - replace with actual search API\n        const mockSuggestions: SearchSuggestion[] = [\n          {\n            id: '1',\n            title: 'IT Infrastructure Modernization',\n            type: 'opportunity',\n            value: 'IT Infrastructure Modernization'\n          },\n          {\n            id: '2',\n            title: 'Department of Veterans Affairs',\n            type: 'agency',\n            value: 'Department of Veterans Affairs'\n          },\n          {\n            id: '3',\n            title: 'Cloud Services',\n            type: 'keyword',\n            value: 'Cloud Services'\n          }\n        ].filter(item => \n          item.title.toLowerCase().includes(query.toLowerCase())\n        );\n        \n        setSuggestions(mockSuggestions);\n      } catch (error) {\n        console.error('Search failed:', error);\n      } finally {\n        setIsLoading(false);\n      }\n    }, 300);\n\n    return () => clearTimeout(timeoutId);\n  }, [query]);\n\n  // Close suggestions when clicking outside\n  useEffect(() => {\n    const handleClickOutside = (event: MouseEvent) => {\n      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {\n        setShowSuggestions(false);\n      }\n    };\n\n    document.addEventListener('mousedown', handleClickOutside);\n    return () => document.removeEventListener('mousedown', handleClickOutside);\n  }, []);\n\n  const handleSearch = (searchQuery: string = query) => {\n    if (searchQuery.trim()) {\n      if (onSearch) {\n        onSearch(searchQuery);\n      } else {\n        navigate(`/search?q=${encodeURIComponent(searchQuery)}`);\n      }\n      setShowSuggestions(false);\n      setQuery(searchQuery);\n    }\n  };\n\n  const handleKeyDown = (e: React.KeyboardEvent) => {\n    if (e.key === 'Enter') {\n      handleSearch();\n    } else if (e.key === 'Escape') {\n      setShowSuggestions(false);\n    }\n  };\n\n  const getSuggestionIcon = (type: string) => {\n    switch (type) {\n      case 'agency': return Building;\n      case 'opportunity': return TrendingUp;\n      default: return Search;\n    }\n  };\n\n  return (\n    <div ref={searchRef} className=\"relative w-full max-w-2xl\">\n      {/* Search Input */}\n      <div className=\"relative\">\n        <div className=\"absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none\">\n          <Search className=\"h-5 w-5 text-white/50\" />\n        </div>\n        <input\n          type=\"text\"\n          value={query}\n          onChange={(e) => {\n            setQuery(e.target.value);\n            setShowSuggestions(true);\n          }}\n          onFocus={() => setShowSuggestions(true)}\n          onKeyDown={handleKeyDown}\n          className=\"w-full pl-10 pr-12 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 backdrop-blur-sm transition-all duration-200\"\n          placeholder={placeholder}\n        />\n        \n        {/* Clear button */}\n        {query && (\n          <button\n            onClick={() => {\n              setQuery('');\n              setSuggestions([]);\n            }}\n            className=\"absolute inset-y-0 right-8 flex items-center text-white/50 hover:text-white/70 transition-colors\"\n          >\n            <X className=\"h-4 w-4\" />\n          </button>\n        )}\n        \n        {/* Filter button */}\n        <button className=\"absolute inset-y-0 right-2 flex items-center text-white/50 hover:text-white/70 transition-colors p-1.5 rounded-lg hover:bg-white/10\">\n          <Filter className=\"h-4 w-4\" />\n        </button>\n      </div>\n\n      {/* Search Suggestions Dropdown */}\n      {showSuggestions && (\n        <div className=\"absolute top-full left-0 right-0 mt-2 glass-strong rounded-xl border border-white/20 shadow-2xl z-50 overflow-hidden\">\n          {isLoading ? (\n            <div className=\"p-4 text-center\">\n              <div className=\"spinner mx-auto mb-2\" />\n              <p className=\"text-white/60 text-sm\">Searching...</p>\n            </div>\n          ) : (\n            <>\n              {/* Search suggestions */}\n              {suggestions.length > 0 && (\n                <div className=\"border-b border-white/10\">\n                  <div className=\"px-4 py-2 text-xs text-white/50 uppercase tracking-wide font-medium\">\n                    Suggestions\n                  </div>\n                  {suggestions.map((suggestion) => {\n                    const Icon = getSuggestionIcon(suggestion.type);\n                    return (\n                      <button\n                        key={suggestion.id}\n                        onClick={() => handleSearch(suggestion.value)}\n                        className=\"w-full flex items-center px-4 py-3 hover:bg-white/10 transition-colors text-left\"\n                      >\n                        <Icon className=\"h-4 w-4 text-white/50 mr-3 flex-shrink-0\" />\n                        <div className=\"flex-1 min-w-0\">\n                          <div className=\"text-white text-sm font-medium truncate\">\n                            {suggestion.title}\n                          </div>\n                          <div className=\"text-white/50 text-xs capitalize\">\n                            {suggestion.type}\n                          </div>\n                        </div>\n                      </button>\n                    );\n                  })}\n                </div>\n              )}\n\n              {/* Recent searches */}\n              {query.length === 0 && (\n                <>\n                  <div className=\"border-b border-white/10\">\n                    <div className=\"px-4 py-2 text-xs text-white/50 uppercase tracking-wide font-medium flex items-center\">\n                      <Clock className=\"h-3 w-3 mr-1\" />\n                      Recent\n                    </div>\n                    {recentSearches.map((search, index) => (\n                      <button\n                        key={index}\n                        onClick={() => handleSearch(search)}\n                        className=\"w-full flex items-center px-4 py-2.5 hover:bg-white/10 transition-colors text-left\"\n                      >\n                        <Clock className=\"h-4 w-4 text-white/50 mr-3\" />\n                        <span className=\"text-white text-sm\">{search}</span>\n                      </button>\n                    ))}\n                  </div>\n\n                  {/* Trending */}\n                  <div>\n                    <div className=\"px-4 py-2 text-xs text-white/50 uppercase tracking-wide font-medium flex items-center\">\n                      <TrendingUp className=\"h-3 w-3 mr-1\" />\n                      Trending\n                    </div>\n                    {trendingKeywords.map((keyword, index) => (\n                      <button\n                        key={index}\n                        onClick={() => handleSearch(keyword)}\n                        className=\"w-full flex items-center px-4 py-2.5 hover:bg-white/10 transition-colors text-left\"\n                      >\n                        <TrendingUp className=\"h-4 w-4 text-orange-400 mr-3\" />\n                        <span className=\"text-white text-sm\">{keyword}</span>\n                      </button>\n                    ))}\n                  </div>\n                </>\n              )}\n              \n              {/* No results */}\n              {query.length > 0 && suggestions.length === 0 && !isLoading && (\n                <div className=\"p-4 text-center text-white/60\">\n                  <Search className=\"h-8 w-8 mx-auto mb-2 opacity-50\" />\n                  <p className=\"text-sm\">No results found for \"{query}\"</p>\n                  <button\n                    onClick={() => handleSearch()}\n                    className=\"mt-2 text-blue-400 hover:text-blue-300 text-sm transition-colors\"\n                  >\n                    Search anyway\n                  </button>\n                </div>\n              )}\n            </>\n          )}\n        </div>\n      )}\n    </div>\n  );\n};\n\nexport default SearchBar;
+import React, { useState, useRef, useEffect } from 'react';
+import { Search, Filter, X, Clock, TrendingUp, Building } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+interface SearchSuggestion {
+  id: string;
+  title: string;
+  type: 'opportunity' | 'agency' | 'keyword';
+  value: string;
+}
+
+interface SearchBarProps {
+  placeholder?: string;
+  onSearch?: (query: string) => void;
+}
+
+const SearchBar: React.FC<SearchBarProps> = ({ 
+  placeholder = "Search opportunities, agencies, keywords...", 
+  onSearch 
+}) => {
+  const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  // Mock recent searches and trending
+  const recentSearches = [
+    'IT Services',
+    'Construction',
+    'Department of Defense',
+    'Software Development'
+  ];
+
+  const trendingKeywords = [
+    'Cybersecurity',
+    'Cloud Computing',
+    'AI/ML Services',
+    'Green Energy'
+  ];
+
+  // Debounced search function
+  useEffect(() => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    setIsLoading(true);
+    const timeoutId = setTimeout(async () => {
+      try {
+        // Mock API call - replace with actual search API
+        const mockSuggestions: SearchSuggestion[] = [
+          {
+            id: '1',
+            title: 'IT Infrastructure Modernization',
+            type: 'opportunity',
+            value: 'IT Infrastructure Modernization'
+          },
+          {
+            id: '2',
+            title: 'Department of Veterans Affairs',
+            type: 'agency',
+            value: 'Department of Veterans Affairs'
+          },
+          {
+            id: '3',
+            title: 'Cloud Services',
+            type: 'keyword',
+            value: 'Cloud Services'
+          }
+        ].filter(item => 
+          item.title.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        setSuggestions(mockSuggestions);
+      } catch (error) {
+        console.error('Search failed:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [query]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearch = (searchQuery: string = query) => {
+    if (searchQuery.trim()) {
+      if (onSearch) {
+        onSearch(searchQuery);
+      } else {
+        navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+      }
+      setShowSuggestions(false);
+      setQuery(searchQuery);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
+
+  const getSuggestionIcon = (type: string) => {
+    switch (type) {
+      case 'agency': return Building;
+      case 'opportunity': return TrendingUp;
+      default: return Search;
+    }
+  };
+
+  return (
+    <div ref={searchRef} className="relative w-full max-w-2xl">
+      {/* Search Input */}
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search className="h-5 w-5 text-white/50" />
+        </div>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setShowSuggestions(true);
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          onKeyDown={handleKeyDown}
+          className="w-full pl-10 pr-12 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 backdrop-blur-sm transition-all duration-200"
+          placeholder={placeholder}
+        />
+        
+        {/* Clear button */}
+        {query && (
+          <button
+            onClick={() => {
+              setQuery('');
+              setSuggestions([]);
+            }}
+            className="absolute inset-y-0 right-8 flex items-center text-white/50 hover:text-white/70 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+        
+        {/* Filter button */}
+        <button className="absolute inset-y-0 right-2 flex items-center text-white/50 hover:text-white/70 transition-colors p-1.5 rounded-lg hover:bg-white/10">
+          <Filter className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Search Suggestions Dropdown */}
+      {showSuggestions && (
+        <div className="absolute top-full left-0 right-0 mt-2 glass-strong rounded-xl border border-white/20 shadow-2xl z-50 overflow-hidden">
+          {isLoading ? (
+            <div className="p-4 text-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-2"></div>
+              <p className="text-white/60 text-sm">Searching...</p>
+            </div>
+          ) : (
+            <>
+              {/* Search suggestions */}
+              {suggestions.length > 0 && (
+                <div className="border-b border-white/10">
+                  <div className="px-4 py-2 text-xs text-white/50 uppercase tracking-wide font-medium">
+                    Suggestions
+                  </div>
+                  {suggestions.map((suggestion) => {
+                    const Icon = getSuggestionIcon(suggestion.type);
+                    return (
+                      <button
+                        key={suggestion.id}
+                        onClick={() => handleSearch(suggestion.value)}
+                        className="w-full flex items-center px-4 py-3 hover:bg-white/10 transition-colors text-left"
+                      >
+                        <Icon className="h-4 w-4 text-white/50 mr-3 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white text-sm font-medium truncate">
+                            {suggestion.title}
+                          </div>
+                          <div className="text-white/50 text-xs capitalize">
+                            {suggestion.type}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Recent searches */}
+              {query.length === 0 && (
+                <>
+                  <div className="border-b border-white/10">
+                    <div className="px-4 py-2 text-xs text-white/50 uppercase tracking-wide font-medium flex items-center">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Recent
+                    </div>
+                    {recentSearches.map((search, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSearch(search)}
+                        className="w-full flex items-center px-4 py-2.5 hover:bg-white/10 transition-colors text-left"
+                      >
+                        <Clock className="h-4 w-4 text-white/50 mr-3" />
+                        <span className="text-white text-sm">{search}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Trending */}
+                  <div>
+                    <div className="px-4 py-2 text-xs text-white/50 uppercase tracking-wide font-medium flex items-center">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      Trending
+                    </div>
+                    {trendingKeywords.map((keyword, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSearch(keyword)}
+                        className="w-full flex items-center px-4 py-2.5 hover:bg-white/10 transition-colors text-left"
+                      >
+                        <TrendingUp className="h-4 w-4 text-orange-400 mr-3" />
+                        <span className="text-white text-sm">{keyword}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              
+              {/* No results */}
+              {query.length > 0 && suggestions.length === 0 && !isLoading && (
+                <div className="p-4 text-center text-white/60">
+                  <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No results found for "{query}"</p>
+                  <button
+                    onClick={() => handleSearch()}
+                    className="mt-2 text-blue-400 hover:text-blue-300 text-sm transition-colors"
+                  >
+                    Search anyway
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SearchBar;

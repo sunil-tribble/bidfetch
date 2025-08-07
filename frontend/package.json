@@ -18,6 +18,8 @@
     "axios": "^1.11.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.536.0",
+    "postcss-flexbugs-fixes": "^5.0.2",
+    "postcss-preset-env": "^10.2.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.7.1",

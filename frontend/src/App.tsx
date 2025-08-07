@@ -2,13 +2,13 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
+import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Search from './pages/Search';
 import OpportunityDetail from './pages/OpportunityDetail';
 import Analytics from './pages/Analytics';
 import Intelligence from './pages/Intelligence';
 import Settings from './pages/Settings';
-import DocumentViewer from './pages/DocumentViewer';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -36,16 +36,16 @@ function App() {
           <NotificationProvider>
             <WebSocketProvider>
               <Router>
-                <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+                <div className="min-h-screen bg-gray-50">
                   <Layout>
                     <Routes>
-                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/" element={<Home />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/search" element={<Search />} />
                       <Route path="/opportunity/:id" element={<OpportunityDetail />} />
                       <Route path="/analytics" element={<Analytics />} />
                       <Route path="/intelligence" element={<Intelligence />} />
                       <Route path="/settings" element={<Settings />} />
-                      <Route path="/document/:id" element={<DocumentViewer />} />
                     </Routes>
                   </Layout>
                 </div>

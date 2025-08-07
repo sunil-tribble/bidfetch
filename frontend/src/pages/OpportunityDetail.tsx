@@ -23,7 +23,24 @@ import {
   AlertCircle,
   CheckCircle,
   ArrowLeft,
-  Briefcase
+  Briefcase,
+  Activity,
+  Target,
+  Award,
+  BarChart3,
+  PieChart,
+  Users,
+  Shield,
+  FileCheck,
+  Timer,
+  Gauge,
+  Zap,
+  BookOpen,
+  MessageSquare,
+  Settings,
+  ChevronDown,
+  Filter,
+  Search
 } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { useNotifications } from '../context/NotificationContext';
@@ -85,7 +102,8 @@ interface OpportunityDetail {
 const OpportunityDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [bookmarked, setBookmarked] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [documentSearchQuery, setDocumentSearchQuery] = useState('');
   const { addNotification } = useNotifications();
   const { subscribe } = useWebSocket();
 
@@ -98,10 +116,10 @@ const OpportunityDetail: React.FC = () => {
       return response.json();
     },
     enabled: !!id,
-    refetchInterval: 60000, // Refetch every minute
+    refetchInterval: 60000,
   });
 
-  // Mock data for demonstration
+  // Mock data for demonstration with enhanced fields
   const mockOpportunity: OpportunityDetail = {
     id: id || '1',
     title: 'Cloud Infrastructure Modernization Services',
@@ -150,7 +168,7 @@ This is a critical mission that requires deep expertise in cloud technologies, f
         id: '1',
         filename: 'RFP_Cloud_Modernization.pdf',
         type: 'Request for Proposal',
-        size: 2457600, // 2.4MB
+        size: 2457600,
         url: '/documents/1/view',
         download_url: '/documents/1/download',
         pages: 45
@@ -159,7 +177,7 @@ This is a critical mission that requires deep expertise in cloud technologies, f
         id: '2',
         filename: 'Statement_of_Work.pdf',
         type: 'Statement of Work',
-        size: 1843200, // 1.8MB
+        size: 1843200,
         url: '/documents/2/view',
         download_url: '/documents/2/download',
         pages: 32
@@ -168,7 +186,7 @@ This is a critical mission that requires deep expertise in cloud technologies, f
         id: '3',
         filename: 'Security_Requirements.pdf',
         type: 'Security Requirements',
-        size: 987600, // 965KB
+        size: 987600,
         url: '/documents/3/view',
         download_url: '/documents/3/download',
         pages: 18
@@ -177,9 +195,17 @@ This is a critical mission that requires deep expertise in cloud technologies, f
         id: '4',
         filename: 'Technical_Specifications.docx',
         type: 'Technical Specifications',
-        size: 1234500, // 1.2MB
+        size: 1234500,
         url: '/documents/4/view',
         download_url: '/documents/4/download'
+      },
+      {
+        id: '5',
+        filename: 'Budget_Template.xlsx',
+        type: 'Budget Template',
+        size: 567800,
+        url: '/documents/5/view',
+        download_url: '/documents/5/download'
       }
     ],
     requirements: `Minimum Requirements:
@@ -229,6 +255,12 @@ Preferred Qualifications:
         title: 'Data Center Consolidation',
         agency: 'General Services Administration',
         value: 32000000
+      },
+      {
+        id: '4',
+        title: 'Cybersecurity Assessment Services',
+        agency: 'Department of Homeland Security',
+        value: 12500000
       }
     ]
   };
@@ -255,6 +287,72 @@ Preferred Qualifications:
   const daysUntilDeadline = differenceInDays(
     parseISO(displayOpportunity.response_deadline), 
     new Date()
+  );
+
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case 'active':
+        return {
+          color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+          icon: CheckCircle,
+          label: 'Active'
+        };
+      case 'closed':
+        return {
+          color: 'bg-slate-50 text-slate-700 border-slate-200',
+          icon: Clock,
+          label: 'Closed'
+        };
+      case 'awarded':
+        return {
+          color: 'bg-blue-50 text-blue-700 border-blue-200',
+          icon: Award,
+          label: 'Awarded'
+        };
+      case 'cancelled':
+        return {
+          color: 'bg-red-50 text-red-700 border-red-200',
+          icon: AlertTriangle,
+          label: 'Cancelled'
+        };
+      default:
+        return {
+          color: 'bg-slate-50 text-slate-700 border-slate-200',
+          icon: AlertCircle,
+          label: 'Unknown'
+        };
+    }
+  };
+
+  const getFileIcon = (filename: string) => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return { icon: FileText, color: 'text-red-600 bg-red-50 border-red-200' };
+      case 'doc':
+      case 'docx':
+        return { icon: FileText, color: 'text-blue-600 bg-blue-50 border-blue-200' };
+      case 'xls':
+      case 'xlsx':
+        return { icon: FileText, color: 'text-green-600 bg-green-50 border-green-200' };
+      default:
+        return { icon: FileText, color: 'text-slate-600 bg-slate-50 border-slate-200' };
+    }
+  };
+
+  const getCompetitionLevel = () => {
+    // Mock calculation based on various factors
+    return 'Medium'; // High, Medium, Low
+  };
+
+  const getAwardProbability = () => {
+    // Mock calculation
+    return 73; // percentage
+  };
+
+  const filteredDocuments = displayOpportunity.documents.filter(doc =>
+    doc.filename.toLowerCase().includes(documentSearchQuery.toLowerCase()) ||
+    doc.type.toLowerCase().includes(documentSearchQuery.toLowerCase())
   );
 
   const handleBookmark = () => {
@@ -296,22 +394,14 @@ Preferred Qualifications:
         duration: 3000
       });
       
-      // Fetch document metadata first
-      const response = await fetch(`/api/opportunities/${id}/documents/${doc.id}`);
-      if (response.ok) {
-        const docData = await response.json();
-        // Open the actual document URL
-        window.open(docData.download_url || doc.url, '_blank');
-        
-        addNotification({
-          type: 'success',
-          title: 'Download Started',
-          message: `${doc.filename} is downloading`,
-          duration: 3000
-        });
-      } else {
-        throw new Error('Failed to fetch document');
-      }
+      window.open(doc.download_url || doc.url, '_blank');
+      
+      addNotification({
+        type: 'success',
+        title: 'Download Started',
+        message: `${doc.filename} is downloading`,
+        duration: 3000
+      });
     } catch (error) {
       addNotification({
         type: 'error',
@@ -331,25 +421,18 @@ Preferred Qualifications:
         duration: 5000
       });
       
-      // Fetch all documents metadata
-      const response = await fetch(`/api/opportunities/${id}/documents`);
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Open each document in a new tab with a small delay
-        data.documents.forEach((doc: Document, index: number) => {
-          setTimeout(() => {
-            window.open(doc.url, '_blank');
-          }, index * 500); // 500ms delay between each
-        });
-        
-        addNotification({
-          type: 'success',
-          title: 'Downloads Started',
-          message: `Downloading ${data.documents.length} documents`,
-          duration: 5000
-        });
-      }
+      displayOpportunity.documents.forEach((doc, index) => {
+        setTimeout(() => {
+          window.open(doc.download_url || doc.url, '_blank');
+        }, index * 500);
+      });
+      
+      addNotification({
+        type: 'success',
+        title: 'Downloads Started',
+        message: `Downloading ${displayOpportunity.documents.length} documents`,
+        duration: 5000
+      });
     } catch (error) {
       addNotification({
         type: 'error',
@@ -360,32 +443,21 @@ Preferred Qualifications:
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'closed': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'awarded': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return CheckCircle;
-      case 'closed': return Clock;
-      case 'awarded': return TrendingUp;
-      case 'cancelled': return AlertTriangle;
-      default: return AlertCircle;
-    }
-  };
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: Eye },
+    { id: 'documents', label: 'Documents', icon: FileText, badge: displayOpportunity.documents.length },
+    { id: 'requirements', label: 'Requirements', icon: CheckCircle },
+    { id: 'evaluation', label: 'Evaluation', icon: Target },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'timeline', label: 'Timeline', icon: Timer }
+  ];
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="spinner mx-auto mb-4" />
-          <p className="text-white/70">Loading opportunity details...</p>
+          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-600">Loading opportunity details...</p>
         </div>
       </div>
     );
@@ -393,12 +465,15 @@ Preferred Qualifications:
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="glass rounded-2xl p-8 text-center max-w-md">
-          <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Opportunity Not Found</h2>
-          <p className="text-white/70 mb-4">The requested opportunity could not be found or may have been removed.</p>
-          <Link to="/search" className="btn-primary">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-sm p-8 text-center max-w-md border">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold text-slate-900 mb-2">Opportunity Not Found</h2>
+          <p className="text-slate-600 mb-4">The requested opportunity could not be found or may have been removed.</p>
+          <Link 
+            to="/search" 
+            className="inline-flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Search
           </Link>
@@ -407,399 +482,692 @@ Preferred Qualifications:
     );
   }
 
-  const StatusIcon = getStatusIcon(displayOpportunity.status);
+  const statusInfo = getStatusInfo(displayOpportunity.status);
+  const StatusIcon = statusInfo.icon;
+  const competitionLevel = getCompetitionLevel();
+  const awardProbability = getAwardProbability();
 
   return (
-    <div className="min-h-screen py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back Button */}
-        <div className="mb-6">
-          <Link 
-            to="/search" 
-            className="inline-flex items-center text-white/70 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Search
-          </Link>
-        </div>
-
-        {/* Header */}
-        <div className="glass rounded-2xl p-8 mb-8 animate-slide-up">
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-4">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(displayOpportunity.status)}`}>
-                  <StatusIcon className="h-4 w-4 mr-2" />
-                  {displayOpportunity.status.toUpperCase()}
-                </span>
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                  {displayOpportunity.type}
-                </span>
-              </div>
-              
-              <h1 className="text-4xl font-bold text-white mb-4">
-                {displayOpportunity.title}
-              </h1>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-white/70">
-                <div className="flex items-center">
-                  <Building className="h-5 w-5 mr-3" />
-                  <div>
-                    <div className="font-medium text-white">{displayOpportunity.agency_name}</div>
-                    <div className="text-sm">{displayOpportunity.office}</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <Globe className="h-5 w-5 mr-3" />
-                  <div>
-                    <div className="font-medium text-white">{displayOpportunity.source}</div>
-                    <div className="text-sm">{displayOpportunity.solicitation_number}</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <DollarSign className="h-5 w-5 mr-3" />
-                  <div>
-                    <div className="font-medium text-white">
-                      ${(displayOpportunity.estimated_value / 1000000).toFixed(1)}M
-                    </div>
-                    <div className="text-sm">Estimated Value</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <Clock className={`h-5 w-5 mr-3 ${daysUntilDeadline <= 7 ? 'text-red-400' : 'text-white/70'}`} />
-                  <div>
-                    <div className={`font-medium ${daysUntilDeadline <= 7 ? 'text-red-400' : 'text-white'}`}>
-                      {daysUntilDeadline > 0 ? `${daysUntilDeadline} days left` : 'Deadline passed'}
-                    </div>
-                    <div className="text-sm">
-                      Due {format(parseISO(displayOpportunity.response_deadline), 'MMM dd, yyyy')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6">
+          {/* Navigation */}
+          <div className="flex items-center justify-between py-4">
+            <Link 
+              to="/search" 
+              className="inline-flex items-center text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Search
+            </Link>
             
             {/* Action Buttons */}
-            <div className="flex items-center space-x-3 ml-8">
+            <div className="flex items-center space-x-3">
               <button
-                onClick={handleBookmark}
-                className={`p-3 rounded-xl border transition-all duration-200 ${
-                  bookmarked 
-                    ? 'bg-blue-500/20 border-blue-500/30 text-blue-300' 
-                    : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20 hover:text-white'
-                }`}
+                onClick={handleShare}
+                className="inline-flex items-center px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-all duration-200"
               >
-                <Bookmark className={`h-5 w-5 ${bookmarked ? 'fill-current' : ''}`} />
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
               </button>
               
               <button
-                onClick={handleShare}
-                className="p-3 bg-white/10 border border-white/20 rounded-xl text-white/70 hover:bg-white/20 hover:text-white transition-all duration-200"
+                onClick={handleBookmark}
+                className={`inline-flex items-center px-4 py-2 rounded-lg transition-all duration-200 ${
+                  bookmarked 
+                    ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' 
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
               >
-                <Share2 className="h-5 w-5" />
+                <Bookmark className={`h-4 w-4 mr-2 ${bookmarked ? 'fill-current' : ''}`} />
+                {bookmarked ? 'Bookmarked' : 'Bookmark'}
               </button>
               
               <button
                 onClick={downloadAllDocuments}
-                className="btn-primary flex items-center"
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download All
               </button>
             </div>
           </div>
-          
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-white/10">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">{displayOpportunity.documents.length}</div>
-              <div className="text-white/60 text-sm">Documents</div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Header Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-8">
+          <div className="p-8">
+            <div className="flex items-start justify-between mb-6">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-3 mb-4">
+                  <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium border ${statusInfo.color}`}>
+                    <StatusIcon className="h-4 w-4 mr-2" />
+                    {statusInfo.label}
+                  </span>
+                  <span className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-sm font-medium">
+                    {displayOpportunity.type}
+                  </span>
+                  {daysUntilDeadline <= 7 && daysUntilDeadline > 0 && (
+                    <span className="px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-sm font-medium">
+                      <Clock className="h-3 w-3 mr-1 inline" />
+                      Urgent
+                    </span>
+                  )}
+                </div>
+                
+                <h1 className="text-4xl font-bold text-slate-900 mb-6 leading-tight">
+                  {displayOpportunity.title}
+                </h1>
+                
+                {/* Key Metrics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <DollarSign className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-slate-900">
+                          ${(displayOpportunity.estimated_value / 1000000).toFixed(1)}M
+                        </div>
+                        <div className="text-sm text-slate-600">Est. Value</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Timer className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-2xl font-bold ${daysUntilDeadline <= 7 ? 'text-red-600' : 'text-slate-900'}`}>
+                          {daysUntilDeadline > 0 ? `${daysUntilDeadline}d` : 'Expired'}
+                        </div>
+                        <div className="text-sm text-slate-600">Days Left</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Users className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-slate-900">{competitionLevel}</div>
+                        <div className="text-sm text-slate-600">Competition</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <Gauge className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-slate-900">{awardProbability}%</div>
+                        <div className="text-sm text-slate-600">Win Chance</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">{displayOpportunity.contacts.length}</div>
-              <div className="text-white/60 text-sm">Contacts</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">{displayOpportunity.naics_codes.length}</div>
-              <div className="text-white/60 text-sm">NAICS Codes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">87%</div>
-              <div className="text-white/60 text-sm">Match Score</div>
+            
+            {/* Agency Information */}
+            <div className="border-t border-slate-100 pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex items-center">
+                  <Building className="h-5 w-5 text-slate-400 mr-3" />
+                  <div>
+                    <div className="font-semibold text-slate-900">{displayOpportunity.agency_name}</div>
+                    <div className="text-sm text-slate-600">{displayOpportunity.office}</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center">
+                  <Globe className="h-5 w-5 text-slate-400 mr-3" />
+                  <div>
+                    <div className="font-semibold text-slate-900">{displayOpportunity.source}</div>
+                    <div className="text-sm text-slate-600">{displayOpportunity.solicitation_number}</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center">
+                  <MapPin className="h-5 w-5 text-slate-400 mr-3" />
+                  <div>
+                    <div className="font-semibold text-slate-900">Location</div>
+                    <div className="text-sm text-slate-600">{displayOpportunity.location}</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Description */}
-            <div className="glass rounded-2xl p-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                <FileText className="h-6 w-6 mr-3" />
-                Description
-              </h2>
-              <div className="text-white/80 leading-relaxed space-y-4">
-                {displayOpportunity.description.split('\n').map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
-                ))}
-              </div>
-            </div>
-
-            {/* Requirements */}
-            {displayOpportunity.requirements && (
-              <div className="glass rounded-2xl p-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
-                <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                  <CheckCircle className="h-6 w-6 mr-3" />
-                  Requirements
-                </h2>
-                <div className="text-white/80 leading-relaxed space-y-2">
-                  {displayOpportunity.requirements.split('\n').map((requirement, index) => (
-                    <p key={index}>{requirement}</p>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Evaluation Criteria */}
-            {displayOpportunity.evaluation_criteria && (
-              <div className="glass rounded-2xl p-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-                <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-                  <TrendingUp className="h-6 w-6 mr-3" />
-                  Evaluation Criteria
-                </h2>
-                <div className="text-white/80 leading-relaxed space-y-2">
-                  {displayOpportunity.evaluation_criteria.split('\n').map((criteria, index) => (
-                    <p key={index}>{criteria}</p>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Documents */}
-            <div className="glass rounded-2xl p-6 animate-slide-up" style={{ animationDelay: '0.4s' }}>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white flex items-center">
-                  <FileText className="h-6 w-6 mr-3" />
-                  Documents ({displayOpportunity.documents.length})
-                </h2>
-                {displayOpportunity.documents.length > 0 && (
+        {/* Tabbed Content */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+          {/* Tab Navigation */}
+          <div className="border-b border-slate-200">
+            <nav className="flex space-x-8 px-8" aria-label="Tabs">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
                   <button
-                    onClick={downloadAllDocuments}
-                    className="btn-secondary text-sm flex items-center"
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm inline-flex items-center transition-colors duration-200 ${
+                      activeTab === tab.id
+                        ? 'border-blue-600 text-blue-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
                   >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download All
+                    <Icon className="h-4 w-4 mr-2" />
+                    {tab.label}
+                    {tab.badge && (
+                      <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
+                        activeTab === tab.id 
+                          ? 'bg-blue-100 text-blue-600' 
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {tab.badge}
+                      </span>
+                    )}
                   </button>
-                )}
-              </div>
-              
-              {displayOpportunity.documents.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-white/30 mx-auto mb-4" />
-                  <p className="text-white/60">No documents available for this opportunity</p>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-8">
+            {activeTab === 'overview' && (
+              <div className="space-y-8">
+                {/* Description */}
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900 mb-4">Description</h3>
+                  <div className="prose prose-slate max-w-none">
+                    {displayOpportunity.description.split('\n\n').map((paragraph, index) => (
+                      <p key={index} className="text-slate-700 leading-relaxed mb-4 last:mb-0">
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {displayOpportunity.documents.map((doc) => {
-                    const fileExt = doc.filename.split('.').pop()?.toLowerCase();
-                    const isPDF = fileExt === 'pdf';
-                    const isDoc = ['doc', 'docx'].includes(fileExt || '');
-                    const isExcel = ['xls', 'xlsx'].includes(fileExt || '');
-                    
-                    return (
-                      <div key={doc.id} className="glass-strong rounded-xl p-4 hover:bg-white/10 transition-all duration-200 group">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center flex-1">
-                            <div className={`p-2 rounded-lg mr-4 ${
-                              isPDF ? 'bg-red-500/20' :
-                              isDoc ? 'bg-blue-500/20' :
-                              isExcel ? 'bg-green-500/20' :
-                              'bg-gray-500/20'
-                            }`}>
-                              <FileText className={`h-5 w-5 ${
-                                isPDF ? 'text-red-300' :
-                                isDoc ? 'text-blue-300' :
-                                isExcel ? 'text-green-300' :
-                                'text-gray-300'
-                              }`} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-white truncate group-hover:text-blue-300 transition-colors">
-                                {doc.filename}
-                              </div>
-                              <div className="text-white/60 text-sm flex items-center space-x-4">
-                                <span className="capitalize">{doc.type}</span>
-                                {doc.size && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{(doc.size / 1024 / 1024).toFixed(1)} MB</span>
-                                  </>
-                                )}
-                                {doc.pages && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{doc.pages} pages</span>
-                                  </>
-                                )}
-                                <span>•</span>
-                                <span className="uppercase">{fileExt}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {isPDF && (
-                              <button
-                                onClick={() => window.open(doc.url, '_blank')}
-                                className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-                                title="Preview PDF"
-                              >
-                                <Eye className="h-4 w-4 text-white" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => downloadDocument(doc)}
-                              className="p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg transition-colors"
-                              title="Download Document"
-                            >
-                              <Download className="h-4 w-4 text-blue-300" />
-                            </button>
-                            <a
-                              href={doc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-                              title="Open in New Tab"
-                            >
-                              <ExternalLink className="h-4 w-4 text-white" />
-                            </a>
+
+                {/* Key Details Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 border-t border-slate-100 pt-8">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Key Information</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center">
+                        <Calendar className="h-5 w-5 text-slate-400 mr-3" />
+                        <div>
+                          <div className="font-medium text-slate-900">Posted Date</div>
+                          <div className="text-sm text-slate-600">
+                            {format(parseISO(displayOpportunity.posted_date), 'MMMM dd, yyyy')}
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-8">
-            {/* Key Details */}
-            <div className="glass rounded-2xl p-6 animate-slide-up" style={{ animationDelay: '0.5s' }}>
-              <h3 className="text-xl font-bold text-white mb-6">Key Details</h3>
-              <div className="space-y-4">
-                <div className="flex items-center text-white/70">
-                  <Calendar className="h-4 w-4 mr-3" />
-                  <div>
-                    <div className="text-white font-medium">
-                      {format(parseISO(displayOpportunity.posted_date), 'MMM dd, yyyy')}
-                    </div>
-                    <div className="text-sm">Posted Date</div>
-                  </div>
-                </div>
-                
-                {displayOpportunity.location && (
-                  <div className="flex items-center text-white/70">
-                    <MapPin className="h-4 w-4 mr-3" />
-                    <div>
-                      <div className="text-white font-medium">{displayOpportunity.location}</div>
-                      <div className="text-sm">Location</div>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="flex items-center text-white/70">
-                  <Tag className="h-4 w-4 mr-3" />
-                  <div>
-                    <div className="text-white font-medium">{displayOpportunity.set_aside_type}</div>
-                    <div className="text-sm">Set-Aside Type</div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-6 pt-4 border-t border-white/10">
-                <div className="text-sm text-white/60 mb-2">NAICS Codes</div>
-                <div className="flex flex-wrap gap-2">
-                  {displayOpportunity.naics_codes.map((code) => (
-                    <span key={code} className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs">
-                      {code}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Contacts */}
-            <div className="glass rounded-2xl p-6 animate-slide-up" style={{ animationDelay: '0.6s' }}>
-              <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-                <User className="h-5 w-5 mr-2" />
-                Contacts
-              </h3>
-              <div className="space-y-4">
-                {displayOpportunity.contacts.map((contact, index) => (
-                  <div key={index} className="glass-strong rounded-xl p-4">
-                    <div className="flex items-center mb-3">
-                      <div className="p-2 bg-green-500/20 rounded-lg mr-3">
-                        <User className="h-4 w-4 text-green-300" />
+                      
+                      <div className="flex items-center">
+                        <Clock className="h-5 w-5 text-slate-400 mr-3" />
+                        <div>
+                          <div className="font-medium text-slate-900">Response Deadline</div>
+                          <div className="text-sm text-slate-600">
+                            {format(parseISO(displayOpportunity.response_deadline), 'MMMM dd, yyyy \'at\' h:mm a')}
+                          </div>
+                        </div>
                       </div>
+                      
+                      <div className="flex items-center">
+                        <Tag className="h-5 w-5 text-slate-400 mr-3" />
+                        <div>
+                          <div className="font-medium text-slate-900">Set-Aside Type</div>
+                          <div className="text-sm text-slate-600">{displayOpportunity.set_aside_type}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Classification</h3>
+                    <div className="space-y-4">
                       <div>
-                        <div className="font-medium text-white">{contact.name}</div>
-                        <div className="text-white/60 text-sm">{contact.title}</div>
+                        <div className="font-medium text-slate-900 mb-2">NAICS Codes</div>
+                        <div className="flex flex-wrap gap-2">
+                          {displayOpportunity.naics_codes.map((code) => (
+                            <span key={code} className="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-sm">
+                              {code}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <a 
-                        href={`mailto:${contact.email}`} 
-                        className="flex items-center text-blue-300 hover:text-blue-200 transition-colors"
-                      >
-                        <Mail className="h-3 w-3 mr-2" />
-                        {contact.email}
-                      </a>
-                      {contact.phone && (
-                        <a 
-                          href={`tel:${contact.phone}`} 
-                          className="flex items-center text-blue-300 hover:text-blue-200 transition-colors"
-                        >
-                          <Phone className="h-3 w-3 mr-2" />
-                          {contact.phone}
-                        </a>
+                      
+                      {displayOpportunity.psc_codes.length > 0 && (
+                        <div>
+                          <div className="font-medium text-slate-900 mb-2">PSC Codes</div>
+                          <div className="flex flex-wrap gap-2">
+                            {displayOpportunity.psc_codes.map((code) => (
+                              <span key={code} className="px-3 py-1 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm">
+                                {code}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Similar Opportunities */}
-            {displayOpportunity.similar_opportunities && displayOpportunity.similar_opportunities.length > 0 && (
-              <div className="glass rounded-2xl p-6 animate-slide-up" style={{ animationDelay: '0.7s' }}>
-                <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-                  <Briefcase className="h-5 w-5 mr-2" />
-                  Similar Opportunities
-                </h3>
-                <div className="space-y-3">
-                  {displayOpportunity.similar_opportunities.map((opp) => (
-                    <Link
-                      key={opp.id}
-                      to={`/opportunity/${opp.id}`}
-                      className="block glass-strong rounded-xl p-4 hover:bg-white/10 transition-all duration-200 group"
-                    >
-                      <div className="text-white font-medium text-sm group-hover:text-blue-300 transition-colors mb-1">
-                        {opp.title}
-                      </div>
-                      <div className="flex items-center justify-between text-white/60 text-xs">
-                        <span>{opp.agency}</span>
-                        <span>${(opp.value / 1000000).toFixed(1)}M</span>
-                      </div>
-                    </Link>
-                  ))}
                 </div>
               </div>
             )}
+
+            {activeTab === 'documents' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    Documents ({displayOpportunity.documents.length})
+                  </h3>
+                  
+                  {/* Document Search */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search documents..."
+                      className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
+                      value={documentSearchQuery}
+                      onChange={(e) => setDocumentSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                {filteredDocuments.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-500">
+                      {documentSearchQuery ? 'No documents match your search' : 'No documents available'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {filteredDocuments.map((doc) => {
+                      const fileInfo = getFileIcon(doc.filename);
+                      const FileIcon = fileInfo.icon;
+                      const fileExt = doc.filename.split('.').pop()?.toLowerCase();
+                      
+                      return (
+                        <div key={doc.id} className="border border-slate-200 rounded-xl p-4 hover:bg-slate-50 transition-all duration-200 group">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center flex-1 min-w-0">
+                              <div className={`p-3 rounded-lg mr-4 border ${fileInfo.color}`}>
+                                <FileIcon className="h-6 w-6" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+                                  {doc.filename}
+                                </div>
+                                <div className="text-sm text-slate-500 flex items-center space-x-4 mt-1">
+                                  <span className="capitalize">{doc.type}</span>
+                                  {doc.size && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{(doc.size / 1024 / 1024).toFixed(1)} MB</span>
+                                    </>
+                                  )}
+                                  {doc.pages && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{doc.pages} pages</span>
+                                    </>
+                                  )}
+                                  <span>•</span>
+                                  <span className="uppercase font-medium">{fileExt}</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2 ml-4">
+                              {fileExt === 'pdf' && (
+                                <button
+                                  onClick={() => window.open(doc.url, '_blank')}
+                                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                                  title="Preview PDF"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => downloadDocument(doc)}
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                title="Download"
+                              >
+                                <Download className="h-4 w-4" />
+                              </button>
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                                title="Open in New Tab"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                {displayOpportunity.documents.length > 0 && (
+                  <div className="border-t border-slate-100 pt-6">
+                    <button
+                      onClick={downloadAllDocuments}
+                      className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download All Documents ({displayOpportunity.documents.length})
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'requirements' && (
+              <div className="space-y-8">
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900 mb-4">Requirements</h3>
+                  <div className="prose prose-slate max-w-none">
+                    {displayOpportunity.requirements.split('\n\n').map((section, index) => (
+                      <div key={index} className="mb-6 last:mb-0">
+                        {section.split('\n').map((line, lineIndex) => (
+                          <p key={lineIndex} className="text-slate-700 leading-relaxed mb-2 last:mb-0">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="border-t border-slate-100 pt-8">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Submission Instructions</h3>
+                  <p className="text-slate-700 leading-relaxed">
+                    {displayOpportunity.submission_instructions}
+                  </p>
+                  
+                  {displayOpportunity.additional_info_link && (
+                    <div className="mt-4">
+                      <a
+                        href={displayOpportunity.additional_info_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-blue-600 hover:text-blue-700 transition-colors"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Additional Information
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'evaluation' && (
+              <div className="space-y-8">
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900 mb-4">Evaluation Criteria</h3>
+                  <div className="prose prose-slate max-w-none">
+                    {displayOpportunity.evaluation_criteria.split('\n\n').map((section, index) => (
+                      <div key={index} className="mb-6 last:mb-0">
+                        {section.split('\n').map((line, lineIndex) => (
+                          <p key={lineIndex} className="text-slate-700 leading-relaxed mb-2 last:mb-0">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'analytics' && (
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Award Probability Gauge */}
+                  <div className="bg-slate-50 rounded-xl p-6">
+                    <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                      <Gauge className="h-5 w-5 mr-2 text-blue-600" />
+                      Award Probability
+                    </h4>
+                    <div className="flex items-center justify-center py-8">
+                      <div className="relative w-32 h-32">
+                        <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
+                          <path
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="#e5e7eb"
+                            strokeWidth="2"
+                          />
+                          <path
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="#3b82f6"
+                            strokeWidth="2"
+                            strokeDasharray={`${awardProbability}, 100`}
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-2xl font-bold text-slate-900">{awardProbability}%</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-600 text-center">
+                      Based on historical data and market analysis
+                    </p>
+                  </div>
+
+                  {/* Competition Analysis */}
+                  <div className="bg-slate-50 rounded-xl p-6">
+                    <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                      <Users className="h-5 w-5 mr-2 text-purple-600" />
+                      Competition Level
+                    </h4>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">Expected Bidders</span>
+                        <span className="font-semibold text-slate-900">8-12</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">Competition Level</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          competitionLevel === 'High' ? 'bg-red-100 text-red-700' :
+                          competitionLevel === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                          {competitionLevel}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">Market Maturity</span>
+                        <span className="font-semibold text-slate-900">Established</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Similar Opportunities */}
+                {displayOpportunity.similar_opportunities && displayOpportunity.similar_opportunities.length > 0 && (
+                  <div>
+                    <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                      <Briefcase className="h-5 w-5 mr-2 text-green-600" />
+                      Similar Opportunities
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {displayOpportunity.similar_opportunities.map((opp) => (
+                        <Link
+                          key={opp.id}
+                          to={`/opportunity/${opp.id}`}
+                          className="block border border-slate-200 rounded-xl p-4 hover:bg-slate-50 hover:border-blue-300 transition-all duration-200 group"
+                        >
+                          <div className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors mb-2 line-clamp-2">
+                            {opp.title}
+                          </div>
+                          <div className="text-sm text-slate-600 mb-2">{opp.agency}</div>
+                          <div className="text-lg font-bold text-green-600">
+                            ${(opp.value / 1000000).toFixed(1)}M
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'timeline' && (
+              <div className="space-y-8">
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900 mb-6">Project Timeline</h3>
+                  
+                  {/* Timeline Visualization */}
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-200"></div>
+                    
+                    <div className="space-y-8">
+                      {/* Posted Date */}
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center relative z-10">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div className="ml-6">
+                          <div className="font-semibold text-slate-900">Opportunity Posted</div>
+                          <div className="text-sm text-slate-600">
+                            {format(parseISO(displayOpportunity.posted_date), 'MMMM dd, yyyy')}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Current Date */}
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center relative z-10">
+                          <Activity className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="ml-6">
+                          <div className="font-semibold text-slate-900">Today</div>
+                          <div className="text-sm text-slate-600">
+                            {format(new Date(), 'MMMM dd, yyyy')}
+                          </div>
+                          <div className="text-xs text-blue-600 mt-1">
+                            {daysUntilDeadline > 0 ? `${daysUntilDeadline} days until deadline` : 'Deadline has passed'}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Response Deadline */}
+                      <div className="flex items-center">
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center relative z-10 ${
+                          daysUntilDeadline <= 0 ? 'bg-red-100' : daysUntilDeadline <= 7 ? 'bg-yellow-100' : 'bg-slate-100'
+                        }`}>
+                          <Clock className={`h-4 w-4 ${
+                            daysUntilDeadline <= 0 ? 'text-red-600' : daysUntilDeadline <= 7 ? 'text-yellow-600' : 'text-slate-600'
+                          }`} />
+                        </div>
+                        <div className="ml-6">
+                          <div className="font-semibold text-slate-900">Response Deadline</div>
+                          <div className="text-sm text-slate-600">
+                            {format(parseISO(displayOpportunity.response_deadline), 'MMMM dd, yyyy \'at\' h:mm a')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Deadline Progress Bar */}
+                <div className="bg-slate-50 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-slate-900">Time Remaining</h4>
+                    <span className={`text-sm font-medium ${
+                      daysUntilDeadline <= 0 ? 'text-red-600' : 
+                      daysUntilDeadline <= 7 ? 'text-yellow-600' : 'text-green-600'
+                    }`}>
+                      {daysUntilDeadline <= 0 ? 'Expired' : `${daysUntilDeadline} days left`}
+                    </span>
+                  </div>
+                  
+                  {daysUntilDeadline > 0 && (
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          daysUntilDeadline <= 7 ? 'bg-red-500' : 
+                          daysUntilDeadline <= 14 ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}
+                        style={{ 
+                          width: `${Math.min(100, Math.max(0, (daysUntilDeadline / 60) * 100))}%` 
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Contacts Sidebar */}
+        <div className="mt-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+            <h3 className="text-xl font-semibold text-slate-900 mb-6 flex items-center">
+              <User className="h-5 w-5 mr-2" />
+              Key Contacts
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {displayOpportunity.contacts.map((contact, index) => (
+                <div key={index} className="border border-slate-200 rounded-xl p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className="font-semibold text-slate-900">{contact.name}</div>
+                      <div className="text-sm text-slate-600">{contact.title}</div>
+                      <div className="text-xs text-slate-500 mt-1 px-2 py-1 bg-slate-100 rounded-full inline-block">
+                        {contact.type}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-slate-100 rounded-lg">
+                      <User className="h-5 w-5 text-slate-600" />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <a 
+                      href={`mailto:${contact.email}`} 
+                      className="flex items-center text-blue-600 hover:text-blue-700 transition-colors text-sm"
+                    >
+                      <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
+                      <span className="truncate">{contact.email}</span>
+                    </a>
+                    {contact.phone && (
+                      <a 
+                        href={`tel:${contact.phone}`} 
+                        className="flex items-center text-blue-600 hover:text-blue-700 transition-colors text-sm"
+                      >
+                        <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
+                        {contact.phone}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

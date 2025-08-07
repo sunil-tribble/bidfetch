@@ -220,42 +220,42 @@ const Dashboard: React.FC = () => {
 
   if (statsLoading || opportunitiesLoading) {
     return (
-      <div className=\"min-h-screen flex items-center justify-center\">
-        <div className=\"text-center\">
-          <div className=\"spinner mx-auto mb-4\" />
-          <p className=\"text-white/70\">Loading your dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="spinner mx-auto mb-4" />
+          <p className="text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className=\"min-h-screen py-8\">
-      <div className=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8\">
+    <div className="min-h-screen py-8 bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header with real-time indicator */}
-        <div className=\"mb-8\">
-          <div className=\"flex items-center justify-between\">
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className=\"text-4xl font-bold text-white mb-2 animate-slide-up\">
+              <h1 className="text-4xl font-bold text-gray-800 mb-2 animate-slide-up">
                 Procurement Intelligence
               </h1>
-              <p className=\"text-white/70 text-lg\">
+              <p className="text-gray-600 text-lg">
                 Real-time insights across 6 global procurement platforms
               </p>
             </div>
-            <div className=\"flex items-center space-x-4\">
+            <div className="flex items-center space-x-4">
               {liveCount > 0 && (
-                <div className=\"glass rounded-lg px-4 py-2 animate-pulse\">
-                  <div className=\"flex items-center space-x-2\">
-                    <div className=\"h-2 w-2 bg-green-400 rounded-full animate-pulse\" />
-                    <span className=\"text-white text-sm font-medium\">+{liveCount} new</span>
+                <div className="card-tribble rounded-lg px-4 py-2 bg-accent-green-50 border border-accent-green-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="h-2 w-2 bg-accent-green-500 rounded-full animate-pulse" />
+                    <span className="text-accent-green-700 text-sm font-medium">+{liveCount} new</span>
                   </div>
                 </div>
               )}
-              <div className=\"glass rounded-lg px-4 py-2\">
-                <div className=\"flex items-center space-x-2\">
-                  <Activity className={`h-4 w-4 ${status === 'connected' ? 'text-green-400' : 'text-yellow-400'}`} />
-                  <span className=\"text-white text-sm capitalize\">
+              <div className="card-tribble rounded-lg px-4 py-2">
+                <div className="flex items-center space-x-2">
+                  <Activity className={`h-4 w-4 ${status === 'connected' ? 'text-accent-green-500' : 'text-warning'}`} />
+                  <span className="text-gray-700 text-sm capitalize">
                     {status === 'connected' ? 'Live' : status}
                   </span>
                 </div>
@@ -265,16 +265,16 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Time Range Selector */}
-        <div className=\"mb-8\">
-          <div className=\"glass rounded-xl p-1 inline-flex space-x-1\">
+        <div className="mb-8">
+          <div className="bg-white rounded-xl p-1 inline-flex space-x-1 border border-gray-200 shadow-sm">
             {timeRanges.map((range) => (
               <button
                 key={range.value}
                 onClick={() => setSelectedTimeRange(range.value)}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                   selectedTimeRange === range.value
-                    ? 'bg-white/20 text-white shadow-lg'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                    ? 'bg-primary-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                 }`}
               >
                 {range.label}
@@ -284,114 +284,114 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8\">
-          <div className=\"glass rounded-2xl p-6 card-hover animate-slide-up\" style={{ animationDelay: '0.1s' }}>
-            <div className=\"flex items-center justify-between\">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="card-tribble card-hover animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <div className="flex items-center justify-between">
               <div>
-                <p className=\"text-white/60 text-sm font-medium\">Total Opportunities</p>
-                <p className=\"text-3xl font-bold text-white mt-2\">
+                <p className="text-gray-500 text-sm font-medium">Total Opportunities</p>
+                <p className="text-3xl font-bold text-gray-800 mt-2">
                   {displayStats.total.toLocaleString()}
                 </p>
-                <div className=\"flex items-center mt-2 text-green-400\">
-                  <TrendingUp className=\"h-4 w-4 mr-1\" />
-                  <span className=\"text-sm font-medium\">+12.5%</span>
+                <div className="flex items-center mt-2 text-success">
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">+12.5%</span>
                 </div>
               </div>
-              <div className=\"h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center\">
-                <FileText className=\"h-6 w-6 text-white\" />
+              <div className="h-12 w-12 bg-primary-blue-100 rounded-xl flex items-center justify-center">
+                <FileText className="h-6 w-6 text-primary-blue-600" />
               </div>
             </div>
           </div>
 
-          <div className=\"glass rounded-2xl p-6 card-hover animate-slide-up\" style={{ animationDelay: '0.2s' }}>
-            <div className=\"flex items-center justify-between\">
+          <div className="card-tribble card-hover animate-slide-up" style={{ animationDelay: '0.2s' }}>
+            <div className="flex items-center justify-between">
               <div>
-                <p className=\"text-white/60 text-sm font-medium\">Active Now</p>
-                <p className=\"text-3xl font-bold text-white mt-2\">
+                <p className="text-gray-500 text-sm font-medium">Active Now</p>
+                <p className="text-3xl font-bold text-gray-800 mt-2">
                   {displayStats.active.toLocaleString()}
                 </p>
-                <div className=\"flex items-center mt-2 text-green-400\">
-                  <Activity className=\"h-4 w-4 mr-1\" />
-                  <span className=\"text-sm font-medium\">Live</span>
+                <div className="flex items-center mt-2 text-success">
+                  <Activity className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">Live</span>
                 </div>
               </div>
-              <div className=\"h-12 w-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl flex items-center justify-center\">
-                <Zap className=\"h-6 w-6 text-white\" />
+              <div className="h-12 w-12 bg-accent-green-100 rounded-xl flex items-center justify-center">
+                <Zap className="h-6 w-6 text-accent-green-600" />
               </div>
             </div>
           </div>
 
-          <div className=\"glass rounded-2xl p-6 card-hover animate-slide-up\" style={{ animationDelay: '0.3s' }}>
-            <div className=\"flex items-center justify-between\">
+          <div className="card-tribble card-hover animate-slide-up" style={{ animationDelay: '0.3s' }}>
+            <div className="flex items-center justify-between">
               <div>
-                <p className=\"text-white/60 text-sm font-medium\">Closing Soon</p>
-                <p className=\"text-3xl font-bold text-white mt-2\">
+                <p className="text-gray-500 text-sm font-medium">Closing Soon</p>
+                <p className="text-3xl font-bold text-gray-800 mt-2">
                   {displayStats.closing_soon.toLocaleString()}
                 </p>
-                <div className=\"flex items-center mt-2 text-yellow-400\">
-                  <Clock className=\"h-4 w-4 mr-1\" />
-                  <span className=\"text-sm font-medium\">< 7 days</span>
+                <div className="flex items-center mt-2 text-warning">
+                  <Clock className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">&lt; 7 days</span>
                 </div>
               </div>
-              <div className=\"h-12 w-12 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center\">
-                <Clock className=\"h-6 w-6 text-white\" />
+              <div className="h-12 w-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+                <Clock className="h-6 w-6 text-warning" />
               </div>
             </div>
           </div>
 
-          <div className=\"glass rounded-2xl p-6 card-hover animate-slide-up\" style={{ animationDelay: '0.4s' }}>
-            <div className=\"flex items-center justify-between\">
+          <div className="card-tribble card-hover animate-slide-up" style={{ animationDelay: '0.4s' }}>
+            <div className="flex items-center justify-between">
               <div>
-                <p className=\"text-white/60 text-sm font-medium\">Total Value</p>
-                <p className=\"text-3xl font-bold text-white mt-2\">
+                <p className="text-gray-500 text-sm font-medium">Total Value</p>
+                <p className="text-3xl font-bold text-gray-800 mt-2">
                   ${(displayStats.total_value / 1000000000).toFixed(1)}B
                 </p>
-                <div className=\"flex items-center mt-2 text-blue-400\">
-                  <DollarSign className=\"h-4 w-4 mr-1\" />
-                  <span className=\"text-sm font-medium\">USD</span>
+                <div className="flex items-center mt-2 text-primary-blue-600">
+                  <DollarSign className="h-4 w-4 mr-1" />
+                  <span className="text-sm font-medium">USD</span>
                 </div>
               </div>
-              <div className=\"h-12 w-12 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-xl flex items-center justify-center\">
-                <Award className=\"h-6 w-6 text-white\" />
+              <div className="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <Award className="h-6 w-6 text-primary-blue-600" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Charts Grid */}
-        <div className=\"grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8\">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Trends Chart */}
-          <div className=\"glass rounded-2xl p-6 animate-slide-up\" style={{ animationDelay: '0.5s' }}>
-            <h3 className=\"text-xl font-bold text-white mb-6 flex items-center\">
-              <BarChart3 className=\"h-5 w-5 mr-2\" />
+          <div className="card-tribble animate-slide-up" style={{ animationDelay: '0.5s' }}>
+            <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+              <BarChart3 className="h-5 w-5 mr-2" />
               Opportunity Trends
             </h3>
-            <div className=\"h-80\">
-              <ResponsiveContainer width=\"100%\" height=\"100%\">
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendData || mockTrendData}>
                   <defs>
-                    <linearGradient id=\"colorOpportunities\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
-                      <stop offset=\"5%\" stopColor=\"#3B82F6\" stopOpacity={0.8}/>
-                      <stop offset=\"95%\" stopColor=\"#3B82F6\" stopOpacity={0.1}/>
+                    <linearGradient id="colorOpportunities" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray=\"3 3\" stroke=\"rgba(255,255,255,0.1)\" />
-                  <XAxis dataKey=\"date\" stroke=\"rgba(255,255,255,0.6)\" />
-                  <YAxis stroke=\"rgba(255,255,255,0.6)\" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="date" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'rgba(0,0,0,0.8)', 
-                      border: '1px solid rgba(255,255,255,0.2)',
+                      backgroundColor: 'white', 
+                      border: '1px solid #e5e7eb',
                       borderRadius: '8px',
-                      color: 'white'
+                      color: '#374151'
                     }} 
                   />
                   <Area 
-                    type=\"monotone\" 
-                    dataKey=\"opportunities\" 
-                    stroke=\"#3B82F6\" 
+                    type="monotone" 
+                    dataKey="opportunities" 
+                    stroke="#3B82F6" 
                     fillOpacity={1} 
-                    fill=\"url(#colorOpportunities)\" 
+                    fill="url(#colorOpportunities)" 
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -399,22 +399,22 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Sources Breakdown */}
-          <div className=\"glass rounded-2xl p-6 animate-slide-up\" style={{ animationDelay: '0.6s' }}>
-            <h3 className=\"text-xl font-bold text-white mb-6 flex items-center\">
-              <Globe className=\"h-5 w-5 mr-2\" />
+          <div className="card-tribble animate-slide-up" style={{ animationDelay: '0.6s' }}>
+            <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+              <Globe className="h-5 w-5 mr-2" />
               Data Sources
             </h3>
-            <div className=\"h-80\">
-              <ResponsiveContainer width=\"100%\" height=\"100%\">
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={sourceData || mockSourceData}
-                    cx=\"50%\"
-                    cy=\"50%\"
+                    cx="50%"
+                    cy="50%"
                     innerRadius={60}
                     outerRadius={120}
                     paddingAngle={2}
-                    dataKey=\"count\"
+                    dataKey="count"
                   >
                     {(sourceData || mockSourceData).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -422,26 +422,26 @@ const Dashboard: React.FC = () => {
                   </Pie>
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'rgba(0,0,0,0.8)', 
-                      border: '1px solid rgba(255,255,255,0.2)',
+                      backgroundColor: 'white', 
+                      border: '1px solid #e5e7eb',
                       borderRadius: '8px',
-                      color: 'white'
+                      color: '#374151'
                     }} 
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className=\"mt-4 space-y-2\">
+            <div className="mt-4 space-y-2">
               {(sourceData || mockSourceData).map((source) => (
-                <div key={source.name} className=\"flex items-center justify-between\">
-                  <div className=\"flex items-center space-x-2\">
+                <div key={source.name} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
                     <div 
-                      className=\"w-3 h-3 rounded-full\" 
+                      className="w-3 h-3 rounded-full" 
                       style={{ backgroundColor: source.color }} 
                     />
-                    <span className=\"text-white text-sm\">{source.name}</span>
+                    <span className="text-gray-700 text-sm">{source.name}</span>
                   </div>
-                  <span className=\"text-white/70 text-sm\">{source.count}</span>
+                  <span className="text-gray-500 text-sm">{source.count}</span>
                 </div>
               ))}
             </div>
@@ -449,69 +449,98 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Recent Opportunities */}
-        <div className=\"glass rounded-2xl p-6 animate-slide-up\" style={{ animationDelay: '0.7s' }}>
-          <div className=\"flex items-center justify-between mb-6\">
-            <h3 className=\"text-xl font-bold text-white flex items-center\">
-              <Target className=\"h-5 w-5 mr-2\" />
+        <div className="card-tribble animate-slide-up" style={{ animationDelay: '0.7s' }}>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-800 flex items-center">
+              <Target className="h-5 w-5 mr-2" />
               Recent Opportunities
             </h3>
             <Link 
-              to=\"/search\"
-              className=\"flex items-center text-blue-400 hover:text-blue-300 transition-colors\"
+              to="/search"
+              className="flex items-center text-primary-blue-600 hover:text-primary-blue-700 transition-colors"
             >
-              <span className=\"text-sm font-medium mr-1\">View All</span>
-              <ArrowUpRight className=\"h-4 w-4\" />
+              <span className="text-sm font-medium mr-1">View All</span>
+              <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
           
-          <div className=\"space-y-4\">
+          <div className="space-y-4">
             {displayOpportunities.slice(0, 5).map((opportunity) => (
-              <div key={opportunity.id} className=\"glass-strong rounded-xl p-4 hover:bg-white/10 transition-all duration-200 group\">
-                <div className=\"flex items-center justify-between\">
-                  <div className=\"flex-1 min-w-0\">
-                    <div className=\"flex items-center space-x-3\">
-                      <div className=\"flex-shrink-0\">
+              <div key={opportunity.id} className="bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-all duration-200 group border border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex-shrink-0">
                         <div className={`h-3 w-3 rounded-full ${
-                          opportunity.status === 'active' ? 'bg-green-400' : 
-                          opportunity.status === 'closed' ? 'bg-red-400' : 'bg-yellow-400'
+                          opportunity.status === 'active' ? 'bg-accent-green-500' : 
+                          opportunity.status === 'closed' ? 'bg-red-500' : 'bg-yellow-500'
                         }`} />
                       </div>
-                      <div className=\"flex-1 min-w-0\">
-                        <h4 className=\"text-white font-medium text-sm group-hover:text-blue-300 transition-colors truncate\">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-gray-800 font-medium text-sm group-hover:text-primary-blue-600 transition-colors truncate">
                           <Link to={`/opportunity/${opportunity.id}`}>
                             {opportunity.title}
                           </Link>
                         </h4>
-                        <div className=\"flex items-center space-x-4 mt-1\">
-                          <div className=\"flex items-center text-white/60 text-xs\">
-                            <Building className=\"h-3 w-3 mr-1\" />
+                        <div className="flex items-center space-x-4 mt-1">
+                          <div className="flex items-center text-gray-500 text-xs">
+                            <Building className="h-3 w-3 mr-1" />
                             <span>{opportunity.agency}</span>
                           </div>
-                          <div className=\"flex items-center text-white/60 text-xs\">
-                            <Globe className=\"h-3 w-3 mr-1\" />
+                          <div className="flex items-center text-gray-500 text-xs">
+                            <Globe className="h-3 w-3 mr-1" />
                             <span>{opportunity.source}</span>
                           </div>
-                          <div className=\"flex items-center text-white/60 text-xs\">
-                            <Calendar className=\"h-3 w-3 mr-1\" />
+                          <div className="flex items-center text-gray-500 text-xs">
+                            <Calendar className="h-3 w-3 mr-1" />
                             <span>{new Date(opportunity.deadline).toLocaleDateString()}</span>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className=\"flex items-center space-x-3\">
-                    <div className=\"text-right\">
-                      <div className=\"text-white font-medium text-sm\">
+                  <div className="flex items-center space-x-3">
+                    <div className="text-right">
+                      <div className="text-gray-800 font-medium text-sm">
                         ${(opportunity.value / 1000000).toFixed(1)}M
                       </div>
                     </div>
-                    <button className=\"text-white/50 hover:text-white transition-colors\">
-                      <Eye className=\"h-4 w-4\" />
+                    <button className="text-gray-400 hover:text-gray-600 transition-colors">
+                      <Eye className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+        {/* Footer Summary */}
+        <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-6 border border-gray-200 animate-slide-up" style={{ animationDelay: '1.3s' }}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            <div>
+              <div className="text-2xl font-bold text-gray-800">
+                {analyticsStats?.summary.total_opportunities.toLocaleString() || '0'}
+              </div>
+              <div className="text-gray-600 text-sm mt-1">Total Opportunities</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-800">
+                {formatCurrency(analyticsStats?.summary.total_value || 0)}
+              </div>
+              <div className="text-gray-600 text-sm mt-1">Total Value</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-800">
+                {formatCurrency(analyticsStats?.summary.avg_value || 0)}
+              </div>
+              <div className="text-gray-600 text-sm mt-1">Average Value</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-800">
+                {analyticsStats?.summary.active_sources || 0}
+              </div>
+              <div className="text-gray-600 text-sm mt-1">Active Sources</div>
+            </div>
           </div>
         </div>
       </div>

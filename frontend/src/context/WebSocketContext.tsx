@@ -1,1 +1,189 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';\nimport { useNotifications } from './NotificationContext';\n\ntype WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';\n\ninterface WebSocketMessage {\n  type: 'opportunity_update' | 'new_opportunity' | 'document_ready' | 'sync_status' | 'error';\n  data: any;\n  timestamp: string;\n}\n\ninterface WebSocketContextType {\n  status: WebSocketStatus;\n  lastMessage: WebSocketMessage | null;\n  sendMessage: (message: any) => void;\n  subscribe: (type: string, callback: (data: any) => void) => () => void;\n}\n\nconst WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);\n\nexport const useWebSocket = () => {\n  const context = useContext(WebSocketContext);\n  if (!context) {\n    throw new Error('useWebSocket must be used within a WebSocketProvider');\n  }\n  return context;\n};\n\ninterface WebSocketProviderProps {\n  children: ReactNode;\n}\n\nexport const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {\n  const [status, setStatus] = useState<WebSocketStatus>('disconnected');\n  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);\n  const [ws, setWs] = useState<WebSocket | null>(null);\n  const [subscribers, setSubscribers] = useState<Map<string, ((data: any) => void)[]>>(new Map());\n  const { addNotification } = useNotifications();\n\n  const connect = useCallback(() => {\n    if (ws?.readyState === WebSocket.OPEN) return;\n\n    setStatus('connecting');\n    \n    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';\n    const wsUrl = `${protocol}//${window.location.host}/ws`;\n    \n    try {\n      const newWs = new WebSocket(wsUrl);\n      \n      newWs.onopen = () => {\n        setStatus('connected');\n        console.log('WebSocket connected');\n        \n        // Send authentication if needed\n        newWs.send(JSON.stringify({ type: 'auth', token: localStorage.getItem('auth_token') }));\n      };\n      \n      newWs.onmessage = (event) => {\n        try {\n          const message: WebSocketMessage = JSON.parse(event.data);\n          setLastMessage(message);\n          \n          // Notify subscribers\n          const callbacks = subscribers.get(message.type) || [];\n          callbacks.forEach(callback => callback(message.data));\n          \n          // Handle global message types\n          switch (message.type) {\n            case 'new_opportunity':\n              addNotification({\n                type: 'info',\n                title: 'New Opportunity',\n                message: `${message.data.title} has been added`,\n                duration: 5000\n              });\n              break;\n            case 'document_ready':\n              addNotification({\n                type: 'success',\n                title: 'Document Ready',\n                message: `Document ${message.data.filename} is now available`,\n                duration: 3000\n              });\n              break;\n            case 'error':\n              addNotification({\n                type: 'error',\n                title: 'System Error',\n                message: message.data.message,\n                duration: 8000\n              });\n              break;\n          }\n        } catch (error) {\n          console.error('Failed to parse WebSocket message:', error);\n        }\n      };\n      \n      newWs.onclose = () => {\n        setStatus('disconnected');\n        console.log('WebSocket disconnected');\n        \n        // Attempt to reconnect after 3 seconds\n        setTimeout(() => {\n          if (document.visibilityState === 'visible') {\n            connect();\n          }\n        }, 3000);\n      };\n      \n      newWs.onerror = (error) => {\n        setStatus('error');\n        console.error('WebSocket error:', error);\n      };\n      \n      setWs(newWs);\n    } catch (error) {\n      setStatus('error');\n      console.error('Failed to create WebSocket connection:', error);\n    }\n  }, [ws, subscribers, addNotification]);\n\n  useEffect(() => {\n    connect();\n    \n    // Handle page visibility changes\n    const handleVisibilityChange = () => {\n      if (document.visibilityState === 'visible' && status === 'disconnected') {\n        connect();\n      }\n    };\n    \n    document.addEventListener('visibilitychange', handleVisibilityChange);\n    \n    return () => {\n      document.removeEventListener('visibilitychange', handleVisibilityChange);\n      if (ws) {\n        ws.close();\n      }\n    };\n  }, [connect, status]);\n\n  const sendMessage = useCallback((message: any) => {\n    if (ws?.readyState === WebSocket.OPEN) {\n      ws.send(JSON.stringify(message));\n    } else {\n      console.warn('WebSocket is not connected');\n    }\n  }, [ws]);\n\n  const subscribe = useCallback((type: string, callback: (data: any) => void) => {\n    setSubscribers(prev => {\n      const newMap = new Map(prev);\n      const existing = newMap.get(type) || [];\n      newMap.set(type, [...existing, callback]);\n      return newMap;\n    });\n\n    // Return unsubscribe function\n    return () => {\n      setSubscribers(prev => {\n        const newMap = new Map(prev);\n        const existing = newMap.get(type) || [];\n        const filtered = existing.filter(cb => cb !== callback);\n        if (filtered.length === 0) {\n          newMap.delete(type);\n        } else {\n          newMap.set(type, filtered);\n        }\n        return newMap;\n      });\n    };\n  }, []);\n\n  return (\n    <WebSocketContext.Provider value={{\n      status,\n      lastMessage,\n      sendMessage,\n      subscribe\n    }}>\n      {children}\n    </WebSocketContext.Provider>\n  );\n};
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { useNotifications } from './NotificationContext';
+
+type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+interface WebSocketMessage {
+  type: 'opportunity_update' | 'new_opportunity' | 'document_ready' | 'sync_status' | 'error';
+  data: any;
+  timestamp: string;
+}
+
+interface WebSocketContextType {
+  status: WebSocketStatus;
+  lastMessage: WebSocketMessage | null;
+  sendMessage: (message: any) => void;
+  subscribe: (type: string, callback: (data: any) => void) => () => void;
+}
+
+const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
+
+export const useWebSocket = () => {
+  const context = useContext(WebSocketContext);
+  if (!context) {
+    throw new Error('useWebSocket must be used within a WebSocketProvider');
+  }
+  return context;
+};
+
+interface WebSocketProviderProps {
+  children: ReactNode;
+}
+
+export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
+  const [status, setStatus] = useState<WebSocketStatus>('disconnected');
+  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [subscribers, setSubscribers] = useState<Map<string, ((data: any) => void)[]>>(new Map());
+  const { addNotification } = useNotifications();
+
+  const connect = useCallback(() => {
+    if (ws?.readyState === WebSocket.OPEN) return;
+
+    setStatus('connecting');
+    
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    try {
+      const newWs = new WebSocket(wsUrl);
+      
+      newWs.onopen = () => {
+        setStatus('connected');
+        console.log('WebSocket connected');
+        
+        // Send authentication if needed
+        newWs.send(JSON.stringify({ type: 'auth', token: localStorage.getItem('auth_token') }));
+      };
+      
+      newWs.onmessage = (event) => {
+        try {
+          const message: WebSocketMessage = JSON.parse(event.data);
+          setLastMessage(message);
+          
+          // Notify subscribers
+          const callbacks = subscribers.get(message.type) || [];
+          callbacks.forEach(callback => callback(message.data));
+          
+          // Handle global message types
+          switch (message.type) {
+            case 'new_opportunity':
+              addNotification({
+                id: Date.now().toString(),
+                type: 'info',
+                title: 'New Opportunity',
+                message: `${message.data.title} has been added`,
+                timestamp: new Date()
+              });
+              break;
+            case 'document_ready':
+              addNotification({
+                id: Date.now().toString(),
+                type: 'success',
+                title: 'Document Ready',
+                message: `Document ${message.data.filename} is now available`,
+                timestamp: new Date()
+              });
+              break;
+            case 'error':
+              addNotification({
+                id: Date.now().toString(),
+                type: 'error',
+                title: 'System Error',
+                message: message.data.message,
+                timestamp: new Date()
+              });
+              break;
+          }
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error);
+        }
+      };
+      
+      newWs.onclose = () => {
+        setStatus('disconnected');
+        console.log('WebSocket disconnected');
+        
+        // Attempt to reconnect after 3 seconds
+        setTimeout(() => {
+          if (document.visibilityState === 'visible') {
+            connect();
+          }
+        }, 3000);
+      };
+      
+      newWs.onerror = (error) => {
+        setStatus('error');
+        console.error('WebSocket error:', error);
+      };
+      
+      setWs(newWs);
+    } catch (error) {
+      setStatus('error');
+      console.error('Failed to create WebSocket connection:', error);
+    }
+  }, [ws, subscribers, addNotification]);
+
+  useEffect(() => {
+    connect();
+    
+    // Handle page visibility changes
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && status === 'disconnected') {
+        connect();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [connect, status]);
+
+  const sendMessage = useCallback((message: any) => {
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+    } else {
+      console.warn('WebSocket is not connected');
+    }
+  }, [ws]);
+
+  const subscribe = useCallback((type: string, callback: (data: any) => void) => {
+    setSubscribers(prev => {
+      const newMap = new Map(prev);
+      const existing = newMap.get(type) || [];
+      newMap.set(type, [...existing, callback]);
+      return newMap;
+    });
+
+    // Return unsubscribe function
+    return () => {
+      setSubscribers(prev => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(type) || [];
+        const filtered = existing.filter(cb => cb !== callback);
+        if (filtered.length === 0) {
+          newMap.delete(type);
+        } else {
+          newMap.set(type, filtered);
+        }
+        return newMap;
+      });
+    };
+  }, []);
+
+  return (
+    <WebSocketContext.Provider value={{
+      status,
+      lastMessage,
+      sendMessage,
+      subscribe
+    }}>
+      {children}
+    </WebSocketContext.Provider>
+  );
+};

@@ -1,1 +1,1214 @@
-import React, { useState, useEffect } from 'react';\nimport { useQuery } from '@tanstack/react-query';\nimport { useSearchParams, Link } from 'react-router-dom';\nimport { \n  Search as SearchIcon, \n  Filter, \n  SortAsc, \n  SortDesc, \n  Calendar,\n  Building,\n  Globe,\n  DollarSign,\n  FileText,\n  Clock,\n  Eye,\n  Bookmark,\n  Download,\n  ExternalLink,\n  MapPin,\n  Tag\n} from 'lucide-react';\nimport { format } from 'date-fns';\nimport { useNotifications } from '../context/NotificationContext';\nimport { useWebSocket } from '../context/WebSocketContext';\n\ninterface Opportunity {\n  id: string;\n  title: string;\n  description: string;\n  agency: string;\n  office: string;\n  source: string;\n  status: 'active' | 'closed' | 'awarded' | 'cancelled';\n  posted_date: string;\n  response_deadline: string;\n  estimated_value: number;\n  naics_codes: string[];\n  psc_codes: string[];\n  set_aside_type: string;\n  documents: string[];\n  location: string;\n  type: string;\n}\n\ninterface SearchFilters {\n  query: string;\n  sources: string[];\n  agencies: string[];\n  statuses: string[];\n  minValue: number | null;\n  maxValue: number | null;\n  dateRange: string;\n  naicsCodes: string[];\n  setAsideTypes: string[];\n  sortBy: string;\n  sortOrder: 'asc' | 'desc';\n}\n\nconst Search: React.FC = () => {\n  const [searchParams, setSearchParams] = useSearchParams();\n  const [showFilters, setShowFilters] = useState(false);\n  const [selectedOpportunities, setSelectedOpportunities] = useState<string[]>([]);\n  const [savedSearches, setSavedSearches] = useState<string[]>([]);\n  const { addNotification } = useNotifications();\n  const { subscribe } = useWebSocket();\n\n  const [filters, setFilters] = useState<SearchFilters>({\n    query: searchParams.get('q') || '',\n    sources: searchParams.getAll('source'),\n    agencies: searchParams.getAll('agency'),\n    statuses: searchParams.getAll('status') || ['active'],\n    minValue: searchParams.get('minValue') ? parseInt(searchParams.get('minValue')!) : null,\n    maxValue: searchParams.get('maxValue') ? parseInt(searchParams.get('maxValue')!) : null,\n    dateRange: searchParams.get('dateRange') || '30d',\n    naicsCodes: searchParams.getAll('naics'),\n    setAsideTypes: searchParams.getAll('setAside'),\n    sortBy: searchParams.get('sortBy') || 'posted_date',\n    sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc'\n  });\n\n  // Fetch search results\n  const { data: searchResults, isLoading, error, refetch } = useQuery({\n    queryKey: ['search-opportunities', filters],\n    queryFn: async () => {\n      const params = new URLSearchParams();\n      if (filters.query) params.append('q', filters.query);\n      filters.sources.forEach(source => params.append('source', source));\n      filters.agencies.forEach(agency => params.append('agency', agency));\n      filters.statuses.forEach(status => params.append('status', status));\n      if (filters.minValue) params.append('minValue', filters.minValue.toString());\n      if (filters.maxValue) params.append('maxValue', filters.maxValue.toString());\n      params.append('dateRange', filters.dateRange);\n      filters.naicsCodes.forEach(code => params.append('naics', code));\n      filters.setAsideTypes.forEach(type => params.append('setAside', type));\n      params.append('sortBy', filters.sortBy);\n      params.append('sortOrder', filters.sortOrder);\n      params.append('limit', '50');\n      \n      const response = await fetch(`/api/opportunities/search?${params.toString()}`);\n      if (!response.ok) throw new Error('Search failed');\n      return response.json();\n    },\n    refetchInterval: 60000, // Refetch every minute\n  });\n\n  // Fetch filter options\n  const { data: filterOptions } = useQuery({\n    queryKey: ['filter-options'],\n    queryFn: async () => {\n      const response = await fetch('/api/opportunities/filters');\n      if (!response.ok) throw new Error('Failed to fetch filter options');\n      return response.json();\n    },\n  });\n\n  // Mock data for demonstration\n  const mockResults = {\n    data: [\n      {\n        id: '1',\n        title: 'Cloud Infrastructure Modernization Services',\n        description: 'Comprehensive cloud migration and modernization services for legacy government systems. Includes assessment, planning, migration, and ongoing support.',\n        agency: 'Department of Defense',\n        office: 'Defense Information Systems Agency',\n        source: 'SAM.gov',\n        status: 'active' as const,\n        posted_date: '2024-07-15T10:30:00Z',\n        response_deadline: '2024-09-15T17:00:00Z',\n        estimated_value: 25000000,\n        naics_codes: ['541511', '541512'],\n        psc_codes: ['D316'],\n        set_aside_type: 'None',\n        documents: ['RFP.pdf', 'SOW.pdf', 'Requirements.docx'],\n        location: 'Fort Belvoir, VA',\n        type: 'Request for Proposal'\n      },\n      {\n        id: '2',\n        title: 'AI-Powered Data Analytics Platform Development',\n        description: 'Development of an advanced AI-powered analytics platform for processing and analyzing large-scale government data sets with real-time insights and predictive capabilities.',\n        agency: 'Department of Veterans Affairs',\n        office: 'Office of Information and Technology',\n        source: 'Grants.gov',\n        status: 'active' as const,\n        posted_date: '2024-07-20T14:15:00Z',\n        response_deadline: '2024-08-28T16:00:00Z',\n        estimated_value: 15000000,\n        naics_codes: ['541511', '541715'],\n        psc_codes: ['D302'],\n        set_aside_type: 'Small Business',\n        documents: ['RFP.pdf', 'Technical_Specs.pdf'],\n        location: 'Washington, DC',\n        type: 'Request for Proposal'\n      },\n      {\n        id: '3',\n        title: 'Cybersecurity Assessment and Implementation',\n        description: 'Comprehensive cybersecurity assessment, vulnerability testing, and implementation of security measures across multiple government facilities and systems.',\n        agency: 'General Services Administration',\n        office: 'Federal Acquisition Service',\n        source: 'FPDS',\n        status: 'active' as const,\n        posted_date: '2024-07-18T09:45:00Z',\n        response_deadline: '2024-09-30T17:00:00Z',\n        estimated_value: 8500000,\n        naics_codes: ['541512', '541519'],\n        psc_codes: ['D316'],\n        set_aside_type: '8(a)',\n        documents: ['SOW.pdf', 'Security_Requirements.pdf', 'Compliance.pdf'],\n        location: 'Multiple Locations',\n        type: 'Request for Proposal'\n      }\n    ],\n    total: 156,\n    page: 1,\n    limit: 50\n  };\n\n  const mockFilterOptions = {\n    sources: ['SAM.gov', 'Grants.gov', 'FPDS', 'TED EU', 'UK Contracts', 'UN Global'],\n    agencies: ['Department of Defense', 'Department of Veterans Affairs', 'General Services Administration', 'Department of Energy', 'Department of Health and Human Services'],\n    setAsideTypes: ['None', 'Small Business', '8(a)', 'HubZone', 'SDVOSB', 'WOSB'],\n    naicsCodes: ['541511', '541512', '541519', '541715', '334510', '237130']\n  };\n\n  const displayResults = searchResults || mockResults;\n  const displayFilterOptions = filterOptions || mockFilterOptions;\n\n  // Update URL params when filters change\n  useEffect(() => {\n    const params = new URLSearchParams();\n    if (filters.query) params.set('q', filters.query);\n    filters.sources.forEach(source => params.append('source', source));\n    filters.agencies.forEach(agency => params.append('agency', agency));\n    filters.statuses.forEach(status => params.append('status', status));\n    if (filters.minValue) params.set('minValue', filters.minValue.toString());\n    if (filters.maxValue) params.set('maxValue', filters.maxValue.toString());\n    params.set('dateRange', filters.dateRange);\n    filters.naicsCodes.forEach(code => params.append('naics', code));\n    filters.setAsideTypes.forEach(type => params.append('setAside', type));\n    params.set('sortBy', filters.sortBy);\n    params.set('sortOrder', filters.sortOrder);\n    \n    setSearchParams(params);\n  }, [filters, setSearchParams]);\n\n  // Subscribe to real-time updates\n  useEffect(() => {\n    const unsubscribe = subscribe('new_opportunity', (data) => {\n      if (data.matches_search) {\n        addNotification({\n          type: 'info',\n          title: 'New Matching Opportunity',\n          message: `${data.title} matches your search criteria`,\n          duration: 5000\n        });\n        refetch();\n      }\n    });\n\n    return unsubscribe;\n  }, [subscribe, addNotification, refetch]);\n\n  const updateFilter = <K extends keyof SearchFilters>(key: K, value: SearchFilters[K]) => {\n    setFilters(prev => ({ ...prev, [key]: value }));\n  };\n\n  const toggleArrayFilter = (key: keyof SearchFilters, value: string) => {\n    const currentArray = filters[key] as string[];\n    const newArray = currentArray.includes(value)\n      ? currentArray.filter(item => item !== value)\n      : [...currentArray, value];\n    updateFilter(key, newArray);\n  };\n\n  const clearAllFilters = () => {\n    setFilters({\n      query: '',\n      sources: [],\n      agencies: [],\n      statuses: ['active'],\n      minValue: null,\n      maxValue: null,\n      dateRange: '30d',\n      naicsCodes: [],\n      setAsideTypes: [],\n      sortBy: 'posted_date',\n      sortOrder: 'desc'\n    });\n  };\n\n  const saveSearch = () => {\n    const searchName = `${filters.query || 'All'} opportunities`;\n    setSavedSearches(prev => [...prev, searchName]);\n    addNotification({\n      type: 'success',\n      title: 'Search Saved',\n      message: `\"${searchName}\" has been saved`,\n      duration: 3000\n    });\n  };\n\n  const exportResults = () => {\n    addNotification({\n      type: 'info',\n      title: 'Exporting Results',\n      message: 'Your search results are being prepared for download',\n      duration: 3000\n    });\n  };\n\n  const getStatusColor = (status: string) => {\n    switch (status) {\n      case 'active': return 'bg-green-100 text-green-800 border-green-200';\n      case 'closed': return 'bg-gray-100 text-gray-800 border-gray-200';\n      case 'awarded': return 'bg-blue-100 text-blue-800 border-blue-200';\n      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';\n      default: return 'bg-gray-100 text-gray-800 border-gray-200';\n    }\n  };\n\n  if (error) {\n    return (\n      <div className=\"min-h-screen flex items-center justify-center\">\n        <div className=\"glass rounded-2xl p-8 text-center\">\n          <div className=\"text-red-400 mb-4\">\n            <SearchIcon className=\"h-12 w-12 mx-auto mb-4\" />\n          </div>\n          <h3 className=\"text-xl font-bold text-white mb-2\">Search Failed</h3>\n          <p className=\"text-white/70 mb-4\">Unable to perform search. Please try again.</p>\n          <button \n            onClick={() => refetch()}\n            className=\"btn-primary\"\n          >\n            Retry Search\n          </button>\n        </div>\n      </div>\n    );\n  }\n\n  return (\n    <div className=\"min-h-screen py-8\">\n      <div className=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8\">\n        {/* Header */}\n        <div className=\"mb-8\">\n          <h1 className=\"text-4xl font-bold text-white mb-4 animate-slide-up\">\n            Advanced Search\n          </h1>\n          <p className=\"text-white/70 text-lg\">\n            Search across {displayFilterOptions.sources.length} procurement platforms with powerful filters\n          </p>\n        </div>\n\n        {/* Search Bar & Controls */}\n        <div className=\"glass rounded-2xl p-6 mb-8 animate-slide-up\" style={{ animationDelay: '0.1s' }}>\n          <div className=\"flex flex-col lg:flex-row gap-4\">\n            {/* Main Search Input */}\n            <div className=\"flex-1\">\n              <div className=\"relative\">\n                <SearchIcon className=\"absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/50\" />\n                <input\n                  type=\"text\"\n                  value={filters.query}\n                  onChange={(e) => updateFilter('query', e.target.value)}\n                  placeholder=\"Search opportunities, agencies, keywords...\"\n                  className=\"w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 backdrop-blur-sm\"\n                />\n              </div>\n            </div>\n\n            {/* Filter Toggle */}\n            <button\n              onClick={() => setShowFilters(!showFilters)}\n              className={`flex items-center px-4 py-3 rounded-xl transition-all duration-200 ${\n                showFilters \n                  ? 'bg-white/20 text-white' \n                  : 'bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'\n              }`}\n            >\n              <Filter className=\"h-5 w-5 mr-2\" />\n              Filters\n            </button>\n\n            {/* Sort Control */}\n            <div className=\"flex items-center space-x-2\">\n              <select\n                value={filters.sortBy}\n                onChange={(e) => updateFilter('sortBy', e.target.value)}\n                className=\"bg-white/10 border border-white/20 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50\"\n              >\n                <option value=\"posted_date\">Posted Date</option>\n                <option value=\"response_deadline\">Deadline</option>\n                <option value=\"estimated_value\">Value</option>\n                <option value=\"title\">Title</option>\n              </select>\n              <button\n                onClick={() => updateFilter('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc')}\n                className=\"p-3 bg-white/10 border border-white/20 rounded-xl hover:bg-white/15 transition-colors\"\n              >\n                {filters.sortOrder === 'asc' ? \n                  <SortAsc className=\"h-5 w-5 text-white\" /> : \n                  <SortDesc className=\"h-5 w-5 text-white\" />\n                }\n              </button>\n            </div>\n          </div>\n        </div>\n\n        {/* Advanced Filters */}\n        {showFilters && (\n          <div className=\"glass rounded-2xl p-6 mb-8 animate-slide-up\" style={{ animationDelay: '0.2s' }}>\n            <div className=\"grid grid-cols-1 lg:grid-cols-3 gap-6\">\n              {/* Data Sources */}\n              <div>\n                <h4 className=\"text-white font-medium mb-3 flex items-center\">\n                  <Globe className=\"h-4 w-4 mr-2\" />\n                  Data Sources\n                </h4>\n                <div className=\"space-y-2 max-h-48 overflow-y-auto\">\n                  {displayFilterOptions.sources.map((source) => (\n                    <label key={source} className=\"flex items-center text-sm\">\n                      <input\n                        type=\"checkbox\"\n                        checked={filters.sources.includes(source)}\n                        onChange={() => toggleArrayFilter('sources', source)}\n                        className=\"mr-2 rounded border-white/20 bg-white/10 text-blue-500 focus:ring-blue-500/50\"\n                      />\n                      <span className=\"text-white/70\">{source}</span>\n                    </label>\n                  ))}\n                </div>\n              </div>\n\n              {/* Agencies */}\n              <div>\n                <h4 className=\"text-white font-medium mb-3 flex items-center\">\n                  <Building className=\"h-4 w-4 mr-2\" />\n                  Agencies\n                </h4>\n                <div className=\"space-y-2 max-h-48 overflow-y-auto\">\n                  {displayFilterOptions.agencies.map((agency) => (\n                    <label key={agency} className=\"flex items-center text-sm\">\n                      <input\n                        type=\"checkbox\"\n                        checked={filters.agencies.includes(agency)}\n                        onChange={() => toggleArrayFilter('agencies', agency)}\n                        className=\"mr-2 rounded border-white/20 bg-white/10 text-blue-500 focus:ring-blue-500/50\"\n                      />\n                      <span className=\"text-white/70 truncate\">{agency}</span>\n                    </label>\n                  ))}\n                </div>\n              </div>\n\n              {/* Value Range */}\n              <div>\n                <h4 className=\"text-white font-medium mb-3 flex items-center\">\n                  <DollarSign className=\"h-4 w-4 mr-2\" />\n                  Value Range\n                </h4>\n                <div className=\"space-y-3\">\n                  <div>\n                    <label className=\"block text-xs text-white/50 mb-1\">Minimum ($)</label>\n                    <input\n                      type=\"number\"\n                      value={filters.minValue || ''}\n                      onChange={(e) => updateFilter('minValue', e.target.value ? parseInt(e.target.value) : null)}\n                      placeholder=\"0\"\n                      className=\"w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50\"\n                    />\n                  </div>\n                  <div>\n                    <label className=\"block text-xs text-white/50 mb-1\">Maximum ($)</label>\n                    <input\n                      type=\"number\"\n                      value={filters.maxValue || ''}\n                      onChange={(e) => updateFilter('maxValue', e.target.value ? parseInt(e.target.value) : null)}\n                      placeholder=\"No limit\"\n                      className=\"w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50\"\n                    />\n                  </div>\n                </div>\n              </div>\n            </div>\n\n            {/* Filter Actions */}\n            <div className=\"flex items-center justify-between mt-6 pt-6 border-t border-white/10\">\n              <button\n                onClick={clearAllFilters}\n                className=\"text-white/70 hover:text-white text-sm transition-colors\"\n              >\n                Clear All Filters\n              </button>\n              <div className=\"flex items-center space-x-3\">\n                <button\n                  onClick={saveSearch}\n                  className=\"btn-secondary\"\n                >\n                  <Bookmark className=\"h-4 w-4 mr-2\" />\n                  Save Search\n                </button>\n                <button\n                  onClick={exportResults}\n                  className=\"btn-primary\"\n                >\n                  <Download className=\"h-4 w-4 mr-2\" />\n                  Export Results\n                </button>\n              </div>\n            </div>\n          </div>\n        )}\n\n        {/* Results Header */}\n        <div className=\"flex items-center justify-between mb-6\">\n          <div className=\"flex items-center space-x-4\">\n            <h2 className=\"text-2xl font-bold text-white\">\n              {isLoading ? 'Searching...' : `${displayResults.total.toLocaleString()} Results`}\n            </h2>\n            {filters.query && (\n              <span className=\"text-white/60\">for \"{filters.query}\"</span>\n            )}\n          </div>\n          <div className=\"text-white/60 text-sm\">\n            Updated in real-time\n          </div>\n        </div>\n\n        {/* Results */}\n        {isLoading ? (\n          <div className=\"space-y-4\">\n            {[...Array(5)].map((_, i) => (\n              <div key={i} className=\"glass rounded-2xl p-6 animate-pulse\">\n                <div className=\"h-4 bg-white/20 rounded mb-2\" />\n                <div className=\"h-3 bg-white/10 rounded mb-4\" />\n                <div className=\"flex space-x-4\">\n                  <div className=\"h-3 bg-white/10 rounded w-20\" />\n                  <div className=\"h-3 bg-white/10 rounded w-32\" />\n                  <div className=\"h-3 bg-white/10 rounded w-24\" />\n                </div>\n              </div>\n            ))}\n          </div>\n        ) : (\n          <div className=\"space-y-6\">\n            {displayResults.data.map((opportunity, index) => (\n              <div \n                key={opportunity.id} \n                className=\"glass rounded-2xl p-6 hover:bg-white/5 transition-all duration-200 card-hover animate-slide-up\"\n                style={{ animationDelay: `${0.1 + index * 0.05}s` }}\n              >\n                <div className=\"flex items-start justify-between mb-4\">\n                  <div className=\"flex-1\">\n                    <div className=\"flex items-center space-x-3 mb-2\">\n                      <h3 className=\"text-xl font-bold text-white hover:text-blue-300 transition-colors\">\n                        <Link to={`/opportunity/${opportunity.id}`}>\n                          {opportunity.title}\n                        </Link>\n                      </h3>\n                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(opportunity.status)}`}>\n                        {opportunity.status.toUpperCase()}\n                      </span>\n                    </div>\n                    \n                    <p className=\"text-white/70 text-sm mb-4 line-clamp-2\">\n                      {opportunity.description}\n                    </p>\n\n                    <div className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm\">\n                      <div className=\"flex items-center text-white/60\">\n                        <Building className=\"h-4 w-4 mr-2\" />\n                        <div>\n                          <div className=\"font-medium text-white\">{opportunity.agency}</div>\n                          <div className=\"text-xs\">{opportunity.office}</div>\n                        </div>\n                      </div>\n\n                      <div className=\"flex items-center text-white/60\">\n                        <Globe className=\"h-4 w-4 mr-2\" />\n                        <div>\n                          <div className=\"font-medium text-white\">{opportunity.source}</div>\n                          <div className=\"text-xs\">{opportunity.type}</div>\n                        </div>\n                      </div>\n\n                      <div className=\"flex items-center text-white/60\">\n                        <Calendar className=\"h-4 w-4 mr-2\" />\n                        <div>\n                          <div className=\"font-medium text-white\">\n                            {format(new Date(opportunity.response_deadline), 'MMM dd, yyyy')}\n                          </div>\n                          <div className=\"text-xs\">Response Due</div>\n                        </div>\n                      </div>\n\n                      <div className=\"flex items-center text-white/60\">\n                        <DollarSign className=\"h-4 w-4 mr-2\" />\n                        <div>\n                          <div className=\"font-medium text-white\">\n                            ${(opportunity.estimated_value / 1000000).toFixed(1)}M\n                          </div>\n                          <div className=\"text-xs\">Estimated Value</div>\n                        </div>\n                      </div>\n                    </div>\n\n                    {/* Tags */}\n                    <div className=\"flex items-center space-x-2 mt-4\">\n                      {opportunity.naics_codes.slice(0, 2).map((code) => (\n                        <span key={code} className=\"px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs\">\n                          NAICS {code}\n                        </span>\n                      ))}\n                      {opportunity.set_aside_type !== 'None' && (\n                        <span className=\"px-2 py-1 bg-green-500/20 text-green-300 rounded text-xs\">\n                          {opportunity.set_aside_type}\n                        </span>\n                      )}\n                      {opportunity.location && (\n                        <span className=\"px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs flex items-center\">\n                          <MapPin className=\"h-3 w-3 mr-1\" />\n                          {opportunity.location}\n                        </span>\n                      )}\n                    </div>\n                  </div>\n\n                  {/* Actions */}\n                  <div className=\"flex items-center space-x-2 ml-6\">\n                    <button className=\"p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors\">\n                      <Eye className=\"h-4 w-4 text-white\" />\n                    </button>\n                    <button className=\"p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors\">\n                      <Bookmark className=\"h-4 w-4 text-white\" />\n                    </button>\n                    <Link \n                      to={`/opportunity/${opportunity.id}`}\n                      className=\"p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg transition-colors\"\n                    >\n                      <ExternalLink className=\"h-4 w-4 text-blue-300\" />\n                    </Link>\n                  </div>\n                </div>\n\n                {/* Documents */}\n                {opportunity.documents.length > 0 && (\n                  <div className=\"border-t border-white/10 pt-4 mt-4\">\n                    <div className=\"flex items-center space-x-2\">\n                      <FileText className=\"h-4 w-4 text-white/60\" />\n                      <span className=\"text-white/60 text-sm font-medium\">Documents:</span>\n                      <div className=\"flex items-center space-x-2\">\n                        {opportunity.documents.slice(0, 3).map((doc, i) => (\n                          <span key={i} className=\"px-2 py-1 bg-white/10 rounded text-xs text-white/70\">\n                            {doc}\n                          </span>\n                        ))}\n                        {opportunity.documents.length > 3 && (\n                          <span className=\"text-white/50 text-xs\">\n                            +{opportunity.documents.length - 3} more\n                          </span>\n                        )}\n                      </div>\n                    </div>\n                  </div>\n                )}\n              </div>\n            ))}\n          </div>\n        )}\n\n        {/* Load More / Pagination */}\n        {displayResults.total > displayResults.data.length && (\n          <div className=\"text-center mt-8\">\n            <button className=\"btn-primary\">\n              Load More Results\n            </button>\n          </div>\n        )}\n      </div>\n    </div>\n  );\n};\n\nexport default Search;
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useSearchParams, Link } from 'react-router-dom';
+import { 
+  Search as SearchIcon, 
+  Filter, 
+  SortAsc, 
+  SortDesc, 
+  Calendar,
+  Building,
+  Globe,
+  DollarSign,
+  FileText,
+  Clock,
+  Eye,
+  Bookmark,
+  Download,
+  ExternalLink,
+  MapPin,
+  Tag,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Save,
+  History,
+  FileType,
+  File,
+  BookOpen,
+  Star,
+  TrendingUp,
+  Settings,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  Minus,
+  Plus
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { useNotifications } from '../context/NotificationContext';
+import { useWebSocket } from '../context/WebSocketContext';
+
+interface Opportunity {
+  id: string;
+  title: string;
+  description: string;
+  agency: string;
+  office: string;
+  source: string;
+  status: 'active' | 'closed' | 'awarded' | 'cancelled';
+  posted_date: string;
+  response_deadline: string;
+  estimated_value: number;
+  naics_codes: string[];
+  psc_codes: string[];
+  set_aside_type: string;
+  documents: Array<{
+    name: string;
+    type: 'pdf' | 'doc' | 'xls' | 'txt' | 'other';
+    size?: string;
+  }>;
+  location: string;
+  type: string;
+}
+
+interface SearchFilters {
+  query: string;
+  sources: string[];
+  agencies: string[];
+  statuses: string[];
+  minValue: number | null;
+  maxValue: number | null;
+  dateRange: string;
+  naicsCodes: string[];
+  setAsideTypes: string[];
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+}
+
+interface SavedSearch {
+  id: string;
+  name: string;
+  filters: SearchFilters;
+  timestamp: string;
+}
+
+const Search: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedOpportunities, setSelectedOpportunities] = useState<string[]>([]);
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveSearchName, setSaveSearchName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const { addNotification } = useNotifications();
+  const { subscribe } = useWebSocket();
+
+  const [filters, setFilters] = useState<SearchFilters>({
+    query: searchParams.get('q') || '',
+    sources: searchParams.getAll('source'),
+    agencies: searchParams.getAll('agency'),
+    statuses: searchParams.getAll('status') || ['active'],
+    minValue: searchParams.get('minValue') ? parseInt(searchParams.get('minValue')!) : null,
+    maxValue: searchParams.get('maxValue') ? parseInt(searchParams.get('maxValue')!) : null,
+    dateRange: searchParams.get('dateRange') || '30d',
+    naicsCodes: searchParams.getAll('naics'),
+    setAsideTypes: searchParams.getAll('setAside'),
+    sortBy: searchParams.get('sortBy') || 'posted_date',
+    sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc'
+  });
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      if (searchQuery && !searchHistory.includes(searchQuery)) {
+        setSearchHistory(prev => [searchQuery, ...prev.slice(0, 9)]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Update filters when debounced query changes
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, query: debouncedQuery }));
+  }, [debouncedQuery]);
+
+  // Fetch search results
+  const { data: searchResults, isLoading, error, refetch } = useQuery({
+    queryKey: ['search-opportunities', filters, currentPage],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.query) params.append('q', filters.query);
+      filters.sources.forEach(source => params.append('source', source));
+      filters.agencies.forEach(agency => params.append('agency', agency));
+      filters.statuses.forEach(status => params.append('status', status));
+      if (filters.minValue) params.append('minValue', filters.minValue.toString());
+      if (filters.maxValue) params.append('maxValue', filters.maxValue.toString());
+      params.append('dateRange', filters.dateRange);
+      filters.naicsCodes.forEach(code => params.append('naics', code));
+      filters.setAsideTypes.forEach(type => params.append('setAside', type));
+      params.append('sortBy', filters.sortBy);
+      params.append('sortOrder', filters.sortOrder);
+      params.append('page', currentPage.toString());
+      params.append('limit', '20');
+      
+      const response = await fetch(`/api/opportunities/search?${params.toString()}`);
+      if (!response.ok) throw new Error('Search failed');
+      return response.json();
+    },
+    refetchInterval: 60000,
+  });
+
+  // Fetch filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: async () => {
+      const response = await fetch('/api/opportunities/filters');
+      if (!response.ok) throw new Error('Failed to fetch filter options');
+      return response.json();
+    },
+  });
+
+  // Mock data with enhanced document structure
+  const mockResults = {
+    data: [
+      {
+        id: '1',
+        title: 'Cloud Infrastructure Modernization Services',
+        description: 'Comprehensive cloud migration and modernization services for legacy government systems. Includes assessment, planning, migration, and ongoing support for enterprise-scale deployments.',
+        agency: 'Department of Defense',
+        office: 'Defense Information Systems Agency',
+        source: 'SAM.gov',
+        status: 'active' as const,
+        posted_date: '2024-07-15T10:30:00Z',
+        response_deadline: '2024-09-15T17:00:00Z',
+        estimated_value: 25000000,
+        naics_codes: ['541511', '541512'],
+        psc_codes: ['D316'],
+        set_aside_type: 'None',
+        documents: [
+          { name: 'RFP_CloudModernization.pdf', type: 'pdf' as const, size: '2.3 MB' },
+          { name: 'Technical_SOW.pdf', type: 'pdf' as const, size: '1.8 MB' },
+          { name: 'Requirements_Matrix.xlsx', type: 'xls' as const, size: '456 KB' },
+          { name: 'Security_Compliance.docx', type: 'doc' as const, size: '892 KB' }
+        ],
+        location: 'Fort Belvoir, VA',
+        type: 'Request for Proposal'
+      },
+      {
+        id: '2',
+        title: 'AI-Powered Data Analytics Platform Development',
+        description: 'Development of an advanced AI-powered analytics platform for processing and analyzing large-scale government data sets with real-time insights and predictive capabilities.',
+        agency: 'Department of Veterans Affairs',
+        office: 'Office of Information and Technology',
+        source: 'Grants.gov',
+        status: 'active' as const,
+        posted_date: '2024-07-20T14:15:00Z',
+        response_deadline: '2024-08-28T16:00:00Z',
+        estimated_value: 15000000,
+        naics_codes: ['541511', '541715'],
+        psc_codes: ['D302'],
+        set_aside_type: 'Small Business',
+        documents: [
+          { name: 'AI_Platform_RFP.pdf', type: 'pdf' as const, size: '3.1 MB' },
+          { name: 'Technical_Specifications.pdf', type: 'pdf' as const, size: '2.5 MB' },
+          { name: 'Data_Requirements.docx', type: 'doc' as const, size: '1.2 MB' }
+        ],
+        location: 'Washington, DC',
+        type: 'Request for Proposal'
+      },
+      {
+        id: '3',
+        title: 'Cybersecurity Assessment and Implementation',
+        description: 'Comprehensive cybersecurity assessment, vulnerability testing, and implementation of security measures across multiple government facilities and systems.',
+        agency: 'General Services Administration',
+        office: 'Federal Acquisition Service',
+        source: 'FPDS',
+        status: 'active' as const,
+        posted_date: '2024-07-18T09:45:00Z',
+        response_deadline: '2024-09-30T17:00:00Z',
+        estimated_value: 8500000,
+        naics_codes: ['541512', '541519'],
+        psc_codes: ['D316'],
+        set_aside_type: '8(a)',
+        documents: [
+          { name: 'Cybersecurity_SOW.pdf', type: 'pdf' as const, size: '1.7 MB' },
+          { name: 'Security_Framework.pdf', type: 'pdf' as const, size: '980 KB' },
+          { name: 'Compliance_Checklist.xlsx', type: 'xls' as const, size: '234 KB' }
+        ],
+        location: 'Multiple Locations',
+        type: 'Request for Proposal'
+      }
+    ],
+    total: 156,
+    page: currentPage,
+    limit: 20,
+    totalPages: 8
+  };
+
+  const mockFilterOptions = {
+    sources: ['SAM.gov', 'Grants.gov', 'FPDS', 'TED EU', 'UK Contracts', 'UN Global'],
+    agencies: ['Department of Defense', 'Department of Veterans Affairs', 'General Services Administration', 'Department of Energy', 'Department of Health and Human Services'],
+    setAsideTypes: ['None', 'Small Business', '8(a)', 'HubZone', 'SDVOSB', 'WOSB'],
+    naicsCodes: ['541511', '541512', '541519', '541715', '334510', '237130']
+  };
+
+  const displayResults = searchResults || mockResults;
+  const displayFilterOptions = filterOptions || mockFilterOptions;
+
+  // Active filters count
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filters.sources.length > 0) count++;
+    if (filters.agencies.length > 0) count++;
+    if (filters.statuses.length !== 1 || filters.statuses[0] !== 'active') count++;
+    if (filters.minValue || filters.maxValue) count++;
+    if (filters.dateRange !== '30d') count++;
+    if (filters.naicsCodes.length > 0) count++;
+    if (filters.setAsideTypes.length > 0) count++;
+    return count;
+  }, [filters]);
+
+  // Update URL params when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filters.query) params.set('q', filters.query);
+    filters.sources.forEach(source => params.append('source', source));
+    filters.agencies.forEach(agency => params.append('agency', agency));
+    filters.statuses.forEach(status => params.append('status', status));
+    if (filters.minValue) params.set('minValue', filters.minValue.toString());
+    if (filters.maxValue) params.set('maxValue', filters.maxValue.toString());
+    params.set('dateRange', filters.dateRange);
+    filters.naicsCodes.forEach(code => params.append('naics', code));
+    filters.setAsideTypes.forEach(type => params.append('setAside', type));
+    params.set('sortBy', filters.sortBy);
+    params.set('sortOrder', filters.sortOrder);
+    
+    setSearchParams(params);
+  }, [filters, setSearchParams]);
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    const unsubscribe = subscribe('new_opportunity', (data) => {
+      if (data.matches_search) {
+        addNotification({
+          type: 'info',
+          title: 'New Matching Opportunity',
+          message: `${data.title} matches your search criteria`,
+          duration: 5000
+        });
+        refetch();
+      }
+    });
+
+    return unsubscribe;
+  }, [subscribe, addNotification, refetch]);
+
+  const updateFilter = <K extends keyof SearchFilters>(key: K, value: SearchFilters[K]) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setCurrentPage(1);
+  };
+
+  const toggleArrayFilter = (key: keyof SearchFilters, value: string) => {
+    const currentArray = filters[key] as string[];
+    const newArray = currentArray.includes(value)
+      ? currentArray.filter(item => item !== value)
+      : [...currentArray, value];
+    updateFilter(key, newArray);
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      query: '',
+      sources: [],
+      agencies: [],
+      statuses: ['active'],
+      minValue: null,
+      maxValue: null,
+      dateRange: '30d',
+      naicsCodes: [],
+      setAsideTypes: [],
+      sortBy: 'posted_date',
+      sortOrder: 'desc'
+    });
+    setSearchQuery('');
+    setCurrentPage(1);
+  };
+
+  const removeFilter = (type: string, value: string) => {
+    switch (type) {
+      case 'source':
+        updateFilter('sources', filters.sources.filter(s => s !== value));
+        break;
+      case 'agency':
+        updateFilter('agencies', filters.agencies.filter(a => a !== value));
+        break;
+      case 'status':
+        const newStatuses = filters.statuses.filter(s => s !== value);
+        updateFilter('statuses', newStatuses.length > 0 ? newStatuses : ['active']);
+        break;
+      case 'naics':
+        updateFilter('naicsCodes', filters.naicsCodes.filter(n => n !== value));
+        break;
+      case 'setAside':
+        updateFilter('setAsideTypes', filters.setAsideTypes.filter(s => s !== value));
+        break;
+    }
+  };
+
+  const saveSearch = () => {
+    if (!saveSearchName.trim()) return;
+    
+    const newSearch: SavedSearch = {
+      id: Date.now().toString(),
+      name: saveSearchName,
+      filters: { ...filters },
+      timestamp: new Date().toISOString()
+    };
+    
+    setSavedSearches(prev => [newSearch, ...prev]);
+    addNotification({
+      type: 'success',
+      title: 'Search Saved',
+      message: `"${saveSearchName}" has been saved`,
+      duration: 3000
+    });
+    
+    setShowSaveDialog(false);
+    setSaveSearchName('');
+  };
+
+  const loadSavedSearch = (savedSearch: SavedSearch) => {
+    setFilters(savedSearch.filters);
+    setSearchQuery(savedSearch.filters.query);
+    setCurrentPage(1);
+    addNotification({
+      type: 'info',
+      title: 'Search Loaded',
+      message: `"${savedSearch.name}" has been loaded`,
+      duration: 3000
+    });
+  };
+
+  const exportResults = () => {
+    addNotification({
+      type: 'info',
+      title: 'Exporting Results',
+      message: 'Your search results are being prepared for download',
+      duration: 3000
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-50 text-green-700 border-green-200';
+      case 'closed': return 'bg-gray-50 text-gray-600 border-gray-200';
+      case 'awarded': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'cancelled': return 'bg-red-50 text-red-600 border-red-200';
+      default: return 'bg-gray-50 text-gray-600 border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active': return <CheckCircle className="h-3 w-3" />;
+      case 'closed': return <XCircle className="h-3 w-3" />;
+      case 'awarded': return <Star className="h-3 w-3" />;
+      case 'cancelled': return <Minus className="h-3 w-3" />;
+      default: return <AlertCircle className="h-3 w-3" />;
+    }
+  };
+
+  const getFileIcon = (type: string) => {
+    switch (type) {
+      case 'pdf': return <File className="h-4 w-4 text-red-500" />;
+      case 'doc': return <FileText className="h-4 w-4 text-blue-500" />;
+      case 'xls': return <BookOpen className="h-4 w-4 text-green-500" />;
+      default: return <FileType className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-md p-8 text-center max-w-md mx-auto">
+          <div className="text-red-500 mb-4">
+            <AlertCircle className="h-12 w-12 mx-auto mb-4" />
+          </div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">Search Failed</h3>
+          <p className="text-gray-600 mb-4">Unable to perform search. Please try again.</p>
+          <button 
+            onClick={() => refetch()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Retry Search
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                Search Opportunities
+              </h1>
+              <p className="text-gray-600">
+                Find and track government contracting opportunities across multiple platforms
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              {savedSearches.length > 0 && (
+                <div className="relative group">
+                  <button className="flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                    <History className="h-4 w-4 mr-2 text-gray-500" />
+                    <span className="text-sm text-gray-700">Saved Searches</span>
+                    <ChevronDown className="h-4 w-4 ml-1 text-gray-500" />
+                  </button>
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                    <div className="p-2">
+                      {savedSearches.map((search) => (
+                        <button
+                          key={search.id}
+                          onClick={() => loadSavedSearch(search)}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <div className="font-medium">{search.name}</div>
+                          <div className="text-xs text-gray-500">
+                            {format(new Date(search.timestamp), 'MMM dd, yyyy')}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => setShowSaveDialog(true)}
+                className="flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Save className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="text-sm text-gray-700">Save Search</span>
+              </button>
+              <button
+                onClick={exportResults}
+                className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                <span className="text-sm">Export</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
+          <div className="p-6">
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* Main Search Input */}
+              <div className="flex-1">
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search opportunities, agencies, keywords..."
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  />
+                  {searchHistory.length > 0 && searchQuery === '' && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                      <div className="p-2">
+                        <div className="text-xs font-medium text-gray-500 mb-2 px-2">Recent Searches</div>
+                        {searchHistory.slice(0, 5).map((query, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setSearchQuery(query)}
+                            className="w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                          >
+                            <Clock className="h-3 w-3 inline mr-2 text-gray-400" />
+                            {query}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Filter Toggle */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center px-4 py-3 rounded-lg border transition-colors ${
+                  showFilters || activeFiltersCount > 0
+                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Filter className="h-5 w-5 mr-2" />
+                <span>Filters</span>
+                {activeFiltersCount > 0 && (
+                  <span className="ml-2 bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Sort Control */}
+              <div className="flex items-center space-x-2">
+                <select
+                  value={filters.sortBy}
+                  onChange={(e) => updateFilter('sortBy', e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="posted_date">Posted Date</option>
+                  <option value="response_deadline">Deadline</option>
+                  <option value="estimated_value">Value</option>
+                  <option value="title">Title</option>
+                </select>
+                <button
+                  onClick={() => updateFilter('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  {filters.sortOrder === 'asc' ? 
+                    <SortAsc className="h-5 w-5 text-gray-600" /> : 
+                    <SortDesc className="h-5 w-5 text-gray-600" />
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Filter Chips */}
+        {activeFiltersCount > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center flex-wrap gap-2">
+              <span className="text-sm font-medium text-gray-600">Active filters:</span>
+              {filters.sources.map(source => (
+                <span key={source} className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full">
+                  {source}
+                  <button onClick={() => removeFilter('source', source)} className="ml-1 hover:text-blue-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              {filters.agencies.map(agency => (
+                <span key={agency} className="inline-flex items-center px-3 py-1 bg-green-50 text-green-700 text-sm rounded-full">
+                  {agency}
+                  <button onClick={() => removeFilter('agency', agency)} className="ml-1 hover:text-green-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              {filters.statuses.filter(status => status !== 'active' || filters.statuses.length > 1).map(status => (
+                <span key={status} className="inline-flex items-center px-3 py-1 bg-purple-50 text-purple-700 text-sm rounded-full">
+                  {status}
+                  <button onClick={() => removeFilter('status', status)} className="ml-1 hover:text-purple-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              {(filters.minValue || filters.maxValue) && (
+                <span className="inline-flex items-center px-3 py-1 bg-yellow-50 text-yellow-700 text-sm rounded-full">
+                  ${filters.minValue || 0}M - ${filters.maxValue || '∞'}M
+                  <button onClick={() => { updateFilter('minValue', null); updateFilter('maxValue', null); }} className="ml-1 hover:text-yellow-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              <button
+                onClick={clearAllFilters}
+                className="text-sm text-red-600 hover:text-red-800 ml-2"
+              >
+                Clear all
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Advanced Filters Sidebar */}
+        {showFilters && (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters</h3>
+                
+                {/* Data Sources */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                    <Globe className="h-4 w-4 mr-2 text-gray-500" />
+                    Data Sources
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {displayFilterOptions.sources.map((source) => (
+                      <label key={source} className="flex items-center text-sm">
+                        <input
+                          type="checkbox"
+                          checked={filters.sources.includes(source)}
+                          onChange={() => toggleArrayFilter('sources', source)}
+                          className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-gray-600">{source}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Agencies */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                    <Building className="h-4 w-4 mr-2 text-gray-500" />
+                    Agencies
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {displayFilterOptions.agencies.map((agency) => (
+                      <label key={agency} className="flex items-center text-sm">
+                        <input
+                          type="checkbox"
+                          checked={filters.agencies.includes(agency)}
+                          onChange={() => toggleArrayFilter('agencies', agency)}
+                          className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-gray-600 truncate" title={agency}>{agency}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Value Range */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                    <DollarSign className="h-4 w-4 mr-2 text-gray-500" />
+                    Value Range (Millions)
+                  </h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Minimum</label>
+                      <input
+                        type="number"
+                        value={filters.minValue || ''}
+                        onChange={(e) => updateFilter('minValue', e.target.value ? parseInt(e.target.value) : null)}
+                        placeholder="0"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Maximum</label>
+                      <input
+                        type="number"
+                        value={filters.maxValue || ''}
+                        onChange={(e) => updateFilter('maxValue', e.target.value ? parseInt(e.target.value) : null)}
+                        placeholder="No limit"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Set-Aside Types */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                    <Tag className="h-4 w-4 mr-2 text-gray-500" />
+                    Set-Aside Types
+                  </h4>
+                  <div className="space-y-2">
+                    {displayFilterOptions.setAsideTypes.map((type) => (
+                      <label key={type} className="flex items-center text-sm">
+                        <input
+                          type="checkbox"
+                          checked={filters.setAsideTypes.includes(type)}
+                          onChange={() => toggleArrayFilter('setAsideTypes', type)}
+                          className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-gray-600">{type}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={clearAllFilters}
+                  className="w-full text-sm text-red-600 hover:text-red-800 border border-red-200 hover:border-red-300 py-2 rounded-lg transition-colors"
+                >
+                  Clear All Filters
+                </button>
+              </div>
+            </div>
+
+            {/* Results Area */}
+            <div className="lg:col-span-3">
+              {/* Results Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-4">
+                  <h2 className="text-xl font-semibold text-gray-800">
+                    {isLoading ? 'Searching...' : `${displayResults.total.toLocaleString()} Results`}
+                  </h2>
+                  {filters.query && (
+                    <span className="text-gray-500">for "{filters.query}"</span>
+                  )}
+                </div>
+                <div className="flex items-center text-sm text-gray-500">
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  Updated in real-time
+                </div>
+              </div>
+
+              {/* Results */}
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
+                      <div className="h-4 bg-gray-200 rounded mb-2 w-3/4" />
+                      <div className="h-3 bg-gray-100 rounded mb-4 w-full" />
+                      <div className="flex space-x-4">
+                        <div className="h-3 bg-gray-100 rounded w-20" />
+                        <div className="h-3 bg-gray-100 rounded w-32" />
+                        <div className="h-3 bg-gray-100 rounded w-24" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {displayResults.data.map((opportunity) => (
+                    <div 
+                      key={opportunity.id} 
+                      className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-6"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h3 className="text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors">
+                              <Link to={`/opportunity/${opportunity.id}`}>
+                                {opportunity.title}
+                              </Link>
+                            </h3>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(opportunity.status)}`}>
+                              {getStatusIcon(opportunity.status)}
+                              <span className="ml-1">{opportunity.status.toUpperCase()}</span>
+                            </span>
+                          </div>
+                          
+                          <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                            {opportunity.description}
+                          </p>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
+                            <div className="flex items-center text-gray-500">
+                              <Building className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-medium text-gray-700 truncate">{opportunity.agency}</div>
+                                <div className="text-xs truncate">{opportunity.office}</div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center text-gray-500">
+                              <Globe className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-medium text-gray-700">{opportunity.source}</div>
+                                <div className="text-xs truncate">{opportunity.type}</div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center text-gray-500">
+                              <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-medium text-gray-700">
+                                  {format(new Date(opportunity.response_deadline), 'MMM dd, yyyy')}
+                                </div>
+                                <div className="text-xs">Response Due</div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center text-gray-500">
+                              <DollarSign className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="font-medium text-gray-700">
+                                  ${(opportunity.estimated_value / 1000000).toFixed(1)}M
+                                </div>
+                                <div className="text-xs">Estimated Value</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Tags */}
+                          <div className="flex items-center flex-wrap gap-2 mb-4">
+                            {opportunity.naics_codes.slice(0, 2).map((code) => (
+                              <span key={code} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                                NAICS {code}
+                              </span>
+                            ))}
+                            {opportunity.set_aside_type !== 'None' && (
+                              <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-medium">
+                                {opportunity.set_aside_type}
+                              </span>
+                            )}
+                            {opportunity.location && (
+                              <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs font-medium flex items-center">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                {opportunity.location}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Documents */}
+                          {opportunity.documents.length > 0 && (
+                            <div className="border-t border-gray-100 pt-4">
+                              <div className="flex items-start space-x-2">
+                                <FileText className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <span className="text-sm font-medium text-gray-600">Documents:</span>
+                                  <div className="flex items-center flex-wrap gap-2 mt-1">
+                                    {opportunity.documents.slice(0, 3).map((doc, i) => (
+                                      <div key={i} className="flex items-center space-x-1 px-2 py-1 bg-gray-50 rounded text-xs">
+                                        {getFileIcon(doc.type)}
+                                        <span className="text-gray-700 truncate max-w-32" title={doc.name}>
+                                          {doc.name}
+                                        </span>
+                                        {doc.size && (
+                                          <span className="text-gray-500">({doc.size})</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {opportunity.documents.length > 3 && (
+                                      <span className="text-gray-500 text-xs">
+                                        +{opportunity.documents.length - 3} more
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center space-x-2 ml-6 flex-shrink-0">
+                          <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Quick View">
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button className="p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 rounded-lg transition-colors" title="Bookmark">
+                            <Bookmark className="h-4 w-4" />
+                          </button>
+                          <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Download Documents">
+                            <Download className="h-4 w-4" />
+                          </button>
+                          <Link 
+                            to={`/opportunity/${opportunity.id}`}
+                            className="p-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                            title="View Details"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Pagination */}
+              {displayResults.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-8">
+                  <div className="text-sm text-gray-600">
+                    Showing {((currentPage - 1) * displayResults.limit) + 1}-{Math.min(currentPage * displayResults.limit, displayResults.total)} of {displayResults.total} results
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      Previous
+                    </button>
+                    <div className="flex items-center space-x-1">
+                      {[...Array(Math.min(displayResults.totalPages, 5))].map((_, i) => {
+                        const page = i + 1;
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-1 text-sm rounded transition-colors ${
+                              currentPage === page
+                                ? 'bg-blue-600 text-white'
+                                : 'border border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(displayResults.totalPages, prev + 1))}
+                      disabled={currentPage === displayResults.totalPages}
+                      className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* No filters sidebar - full width results */}
+        {!showFilters && (
+          <>
+            {/* Results Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  {isLoading ? 'Searching...' : `${displayResults.total.toLocaleString()} Results`}
+                </h2>
+                {filters.query && (
+                  <span className="text-gray-500">for "{filters.query}"</span>
+                )}
+              </div>
+              <div className="flex items-center text-sm text-gray-500">
+                <TrendingUp className="h-4 w-4 mr-1" />
+                Updated in real-time
+              </div>
+            </div>
+
+            {/* Results */}
+            {isLoading ? (
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded mb-2 w-3/4" />
+                    <div className="h-3 bg-gray-100 rounded mb-4 w-full" />
+                    <div className="flex space-x-4">
+                      <div className="h-3 bg-gray-100 rounded w-20" />
+                      <div className="h-3 bg-gray-100 rounded w-32" />
+                      <div className="h-3 bg-gray-100 rounded w-24" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {displayResults.data.map((opportunity) => (
+                  <div 
+                    key={opportunity.id} 
+                    className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-6"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors">
+                            <Link to={`/opportunity/${opportunity.id}`}>
+                              {opportunity.title}
+                            </Link>
+                          </h3>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(opportunity.status)}`}>
+                            {getStatusIcon(opportunity.status)}
+                            <span className="ml-1">{opportunity.status.toUpperCase()}</span>
+                          </span>
+                        </div>
+                        
+                        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                          {opportunity.description}
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
+                          <div className="flex items-center text-gray-500">
+                            <Building className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-700 truncate">{opportunity.agency}</div>
+                              <div className="text-xs truncate">{opportunity.office}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center text-gray-500">
+                            <Globe className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-700">{opportunity.source}</div>
+                              <div className="text-xs truncate">{opportunity.type}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center text-gray-500">
+                            <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-700">
+                                {format(new Date(opportunity.response_deadline), 'MMM dd, yyyy')}
+                              </div>
+                              <div className="text-xs">Response Due</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center text-gray-500">
+                            <DollarSign className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-700">
+                                ${(opportunity.estimated_value / 1000000).toFixed(1)}M
+                              </div>
+                              <div className="text-xs">Estimated Value</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tags */}
+                        <div className="flex items-center flex-wrap gap-2 mb-4">
+                          {opportunity.naics_codes.slice(0, 2).map((code) => (
+                            <span key={code} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                              NAICS {code}
+                            </span>
+                          ))}
+                          {opportunity.set_aside_type !== 'None' && (
+                            <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-medium">
+                              {opportunity.set_aside_type}
+                            </span>
+                          )}
+                          {opportunity.location && (
+                            <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs font-medium flex items-center">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {opportunity.location}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Documents */}
+                        {opportunity.documents.length > 0 && (
+                          <div className="border-t border-gray-100 pt-4">
+                            <div className="flex items-start space-x-2">
+                              <FileText className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <span className="text-sm font-medium text-gray-600">Documents:</span>
+                                <div className="flex items-center flex-wrap gap-2 mt-1">
+                                  {opportunity.documents.slice(0, 3).map((doc, i) => (
+                                    <div key={i} className="flex items-center space-x-1 px-2 py-1 bg-gray-50 rounded text-xs">
+                                      {getFileIcon(doc.type)}
+                                      <span className="text-gray-700 truncate max-w-32" title={doc.name}>
+                                        {doc.name}
+                                      </span>
+                                      {doc.size && (
+                                        <span className="text-gray-500">({doc.size})</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {opportunity.documents.length > 3 && (
+                                    <span className="text-gray-500 text-xs">
+                                      +{opportunity.documents.length - 3} more
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center space-x-2 ml-6 flex-shrink-0">
+                        <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Quick View">
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button className="p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 rounded-lg transition-colors" title="Bookmark">
+                          <Bookmark className="h-4 w-4" />
+                        </button>
+                        <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Download Documents">
+                          <Download className="h-4 w-4" />
+                        </button>
+                        <Link 
+                          to={`/opportunity/${opportunity.id}`}
+                          className="p-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                          title="View Details"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {displayResults.totalPages > 1 && (
+              <div className="flex items-center justify-between mt-8">
+                <div className="text-sm text-gray-600">
+                  Showing {((currentPage - 1) * displayResults.limit) + 1}-{Math.min(currentPage * displayResults.limit, displayResults.total)} of {displayResults.total} results
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex items-center space-x-1">
+                    {[...Array(Math.min(displayResults.totalPages, 5))].map((_, i) => {
+                      const page = i + 1;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 text-sm rounded transition-colors ${
+                            currentPage === page
+                              ? 'bg-blue-600 text-white'
+                              : 'border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(displayResults.totalPages, prev + 1))}
+                    disabled={currentPage === displayResults.totalPages}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Save Search Dialog */}
+      {showSaveDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Save Search</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Search Name
+              </label>
+              <input
+                type="text"
+                value={saveSearchName}
+                onChange={(e) => setSaveSearchName(e.target.value)}
+                placeholder="Enter a name for this search"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="flex items-center justify-end space-x-3">
+              <button
+                onClick={() => setShowSaveDialog(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveSearch}
+                disabled={!saveSearchName.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Save Search
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Search;

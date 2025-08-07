@@ -571,6 +571,7 @@ router.post('/search/advanced', async (req, res) => {
         // Remove raw data if not requested
         if (!include_raw) {
             opportunities = opportunities.map(opp => {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { raw_data, ...rest } = opp;
                 return rest;
             });
@@ -612,7 +613,7 @@ router.post('/search/advanced', async (req, res) => {
     }
 });
 // Get filter options for search
-router.get('/filters', async (req, res) => {
+router.get('/filters', async (_req, res) => {
     try {
         const opportunities = loadOpportunitiesFromFile().map(transformOpportunity);
         // Extract unique values for filters
@@ -659,6 +660,205 @@ router.get('/health', (_req, res) => {
             status: 'unhealthy',
             error: 'Failed to load opportunities data'
         });
+    }
+});
+// Dashboard endpoints
+router.get('/dashboard', async (req, res) => {
+    try {
+        const { range = '30d' } = req.query;
+        const opportunities = loadOpportunitiesFromFile().map(transformOpportunity);
+        const now = new Date();
+        const rangeInDays = {
+            '1d': 1,
+            '7d': 7,
+            '30d': 30,
+            '90d': 90
+        }[range] || 30;
+        const cutoffDate = new Date(now.getTime() - rangeInDays * 24 * 60 * 60 * 1000);
+        // Filter opportunities by date range
+        const recentOpportunities = opportunities.filter(opp => new Date(opp.posted_date) >= cutoffDate);
+        const activeOpportunities = opportunities.filter(opp => opp.status === 'active');
+        const closingSoon = activeOpportunities.filter(opp => {
+            const deadline = new Date(opp.response_deadline);
+            const daysUntilDeadline = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+            return daysUntilDeadline <= 7 && daysUntilDeadline > 0;
+        });
+        const totalValue = activeOpportunities.reduce((sum, opp) => sum + (opp.estimated_value || 0), 0);
+        const newToday = opportunities.filter(opp => {
+            const posted = new Date(opp.posted_date);
+            const today = new Date();
+            return posted.toDateString() === today.toDateString();
+        }).length;
+        // Calculate win rate (mock data for demo)
+        const winRate = Math.floor(Math.random() * 30) + 15; // 15-45%
+        res.json({
+            total_opportunities: opportunities.length,
+            active_opportunities: activeOpportunities.length,
+            new_today: newToday,
+            closing_soon: closingSoon.length,
+            total_value: totalValue,
+            avg_value: totalValue / activeOpportunities.length || 0,
+            sources_active: 6,
+            win_rate: winRate,
+            response_time_avg: 2.5,
+            range_filter: range,
+            last_updated: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error fetching dashboard data', error);
+        res.status(500).json({ error: 'Failed to fetch dashboard data' });
+    }
+});
+// Trending opportunities endpoint
+router.get('/trending', async (req, res) => {
+    try {
+        const { limit = 10 } = req.query;
+        const opportunities = loadOpportunitiesFromFile().map(transformOpportunity);
+        // Score opportunities based on recency, value, and agency activity
+        const scoredOpportunities = opportunities
+            .filter(opp => opp.status === 'active')
+            .map(opp => {
+            const posted = new Date(opp.posted_date);
+            const now = new Date();
+            const daysOld = (now.getTime() - posted.getTime()) / (1000 * 60 * 60 * 24);
+            let score = 0;
+            // Recency score (newer = higher)
+            if (daysOld <= 1)
+                score += 50;
+            else if (daysOld <= 3)
+                score += 30;
+            else if (daysOld <= 7)
+                score += 20;
+            else if (daysOld <= 14)
+                score += 10;
+            // Value score
+            const value = opp.estimated_value || 0;
+            if (value >= 50000000)
+                score += 30;
+            else if (value >= 10000000)
+                score += 20;
+            else if (value >= 1000000)
+                score += 10;
+            // High-activity agencies get bonus
+            const highActivityAgencies = ['Department of Defense', 'General Services Administration', 'Department of Veterans Affairs'];
+            if (highActivityAgencies.includes(opp.agency_name || ''))
+                score += 15;
+            // Document availability
+            if (opp.documents && opp.documents.length > 3)
+                score += 10;
+            return { ...opp, trending_score: score };
+        })
+            .sort((a, b) => b.trending_score - a.trending_score)
+            .slice(0, Number(limit));
+        res.json(scoredOpportunities);
+    }
+    catch (error) {
+        logger_1.logger.error('Error fetching trending opportunities', error);
+        res.status(500).json({ error: 'Failed to fetch trending opportunities' });
+    }
+});
+// Analytics stats endpoint
+router.get('/stats', async (req, res) => {
+    try {
+        const { range = '30d' } = req.query;
+        const opportunities = loadOpportunitiesFromFile().map(transformOpportunity);
+        const rangeInDays = {
+            '1d': 1,
+            '7d': 7,
+            '30d': 30,
+            '90d': 90
+        }[range] || 30;
+        const now = new Date();
+        const cutoffDate = new Date(now.getTime() - rangeInDays * 24 * 60 * 60 * 1000);
+        // Generate trend data for charts
+        const trendData = [];
+        for (let i = rangeInDays - 1; i >= 0; i--) {
+            const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+            const dayOpportunities = opportunities.filter(opp => {
+                const posted = new Date(opp.posted_date);
+                return posted.toDateString() === date.toDateString();
+            });
+            trendData.push({
+                date: date.toISOString().split('T')[0],
+                opportunities: dayOpportunities.length,
+                value: dayOpportunities.reduce((sum, opp) => sum + (opp.estimated_value || 0), 0)
+            });
+        }
+        // Source breakdown
+        const sourceBreakdown = {
+            'SAM.gov': { count: 0, value: 0, color: '#3B82F6' },
+            'Grants.gov': { count: 0, value: 0, color: '#10B981' },
+            'FPDS': { count: 0, value: 0, color: '#EF4444' },
+            'FBO.gov': { count: 0, value: 0, color: '#F59E0B' },
+            'Other': { count: 0, value: 0, color: '#8B5CF6' }
+        };
+        opportunities.forEach(opp => {
+            const source = opp.source || 'SAM.gov';
+            if (sourceBreakdown[source]) {
+                sourceBreakdown[source].count++;
+                sourceBreakdown[source].value += opp.estimated_value || 0;
+            }
+            else {
+                sourceBreakdown['Other'].count++;
+                sourceBreakdown['Other'].value += opp.estimated_value || 0;
+            }
+        });
+        // Agency breakdown (top 10)
+        const agencyStats = {};
+        opportunities.forEach(opp => {
+            const agency = opp.agency_name || 'Unknown';
+            if (!agencyStats[agency]) {
+                agencyStats[agency] = { count: 0, value: 0 };
+            }
+            agencyStats[agency].count++;
+            agencyStats[agency].value += opp.estimated_value || 0;
+        });
+        const topAgencies = Object.entries(agencyStats)
+            .sort(([, a], [, b]) => b.count - a.count)
+            .slice(0, 10)
+            .map(([name, stats]) => ({ name, ...stats }));
+        // Value range breakdown
+        const valueRanges = {
+            'Under $100K': 0,
+            '$100K - $1M': 0,
+            '$1M - $10M': 0,
+            '$10M - $100M': 0,
+            'Over $100M': 0
+        };
+        opportunities.forEach(opp => {
+            const value = opp.estimated_value || 0;
+            if (value < 100000)
+                valueRanges['Under $100K']++;
+            else if (value < 1000000)
+                valueRanges['$100K - $1M']++;
+            else if (value < 10000000)
+                valueRanges['$1M - $10M']++;
+            else if (value < 100000000)
+                valueRanges['$10M - $100M']++;
+            else
+                valueRanges['Over $100M']++;
+        });
+        res.json({
+            trend_data: trendData,
+            source_breakdown: Object.entries(sourceBreakdown)
+                .filter(([, data]) => data.count > 0)
+                .map(([name, data]) => ({ name, ...data })),
+            agency_breakdown: topAgencies,
+            value_range_breakdown: Object.entries(valueRanges)
+                .map(([range, count]) => ({ range, count }))
+                .filter(item => item.count > 0),
+            summary: {
+                total_opportunities: opportunities.length,
+                total_value: opportunities.reduce((sum, opp) => sum + (opp.estimated_value || 0), 0),
+                avg_value: opportunities.reduce((sum, opp) => sum + (opp.estimated_value || 0), 0) / opportunities.length,
+                active_sources: Object.values(sourceBreakdown).filter(s => s.count > 0).length
+            }
+        });
+    }
+    catch (error) {
+        logger_1.logger.error('Error fetching stats', error);
+        res.status(500).json({ error: 'Failed to fetch stats' });
     }
 });
 exports.opportunityRoutes = router;
