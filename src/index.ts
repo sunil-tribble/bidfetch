@@ -1,4 +1,6 @@
 import express from 'express';
+import cors from 'cors';
+import path from 'path';
 import { config } from './config';
 import { logger } from './utils/logger';
 import { opportunityRoutes } from './api/routes/opportunities';
@@ -9,8 +11,13 @@ import { schedulerService } from './scheduler';
 const app = express();
 
 // Middleware
+app.use(cors()); // Enable CORS for all origins
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from frontend build
+const frontendPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendPath));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -21,6 +28,16 @@ app.get('/health', (req, res) => {
 app.use('/api/opportunities', opportunityRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/intelligence', intelligenceRoutes);
+
+// Catch-all handler: send back React's index.html file for SPA routing
+app.get('*', (req, res) => {
+  // Skip API routes
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

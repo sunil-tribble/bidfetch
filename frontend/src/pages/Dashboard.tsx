@@ -1,283 +1,513 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  TrendingUp,
-  FileText,
-  Briefcase,
+import { 
+  BarChart3, 
+  TrendingUp, 
+  FileText, 
+  Clock, 
   DollarSign,
-  Calendar,
-  AlertCircle,
-  ArrowUp,
-  ArrowDown,
-  Clock,
+  Globe,
+  Zap,
   Target,
+  ArrowUpRight,
+  Calendar,
+  Building,
+  Award,
+  Activity,
+  Eye,
+  AlertTriangle,
+  CheckCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { opportunitiesApi, contractsApi, intelligenceApi } from '../services/api';
-import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import { format } from 'date-fns';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useWebSocket } from '../context/WebSocketContext';
+import { useNotifications } from '../context/NotificationContext';
+
+interface OpportunityStats {
+  total: number;
+  active: number;
+  new_today: number;
+  closing_soon: number;
+  total_value: number;
+  sources_active: number;
+  avg_response_time: number;
+}
+
+interface RecentOpportunity {
+  id: string;
+  title: string;
+  agency: string;
+  status: string;
+  deadline: string;
+  value: number;
+  source: string;
+  naics_codes: string[];
+}
+
+interface TrendData {
+  date: string;
+  opportunities: number;
+  value: number;
+}
+
+interface SourceData {
+  name: string;
+  count: number;
+  value: number;
+  color: string;
+}
 
 const Dashboard: React.FC = () => {
-  // Fetch dashboard data
-  const { data: opportunities } = useQuery({
-    queryKey: ['opportunities', 'recent'],
-    queryFn: () => opportunitiesApi.search({ limit: 10, sort: 'posted_date', order: 'desc' }),
+  const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
+  const [liveCount, setLiveCount] = useState(0);
+  const { status, subscribe } = useWebSocket();
+  const { addNotification } = useNotifications();
+
+  // Fetch dashboard stats
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery<OpportunityStats>({
+    queryKey: ['dashboard-stats', selectedTimeRange],
+    queryFn: async () => {
+      const response = await fetch(`/api/dashboard/stats?range=${selectedTimeRange}`);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      return response.json();
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
-  const { data: expiringContracts } = useQuery({
-    queryKey: ['contracts', 'expiring'],
-    queryFn: () => contractsApi.getExpiring(6),
+  // Fetch recent opportunities
+  const { data: recentOpportunities, isLoading: opportunitiesLoading, refetch: refetchOpportunities } = useQuery<RecentOpportunity[]>({
+    queryKey: ['recent-opportunities'],
+    queryFn: async () => {
+      const response = await fetch('/api/opportunities?limit=10&sort=created_desc');
+      if (!response.ok) throw new Error('Failed to fetch opportunities');
+      const data = await response.json();
+      return data.data;
+    },
+    refetchInterval: 30000,
   });
 
-  const { data: recompetes } = useQuery({
-    queryKey: ['recompetes'],
-    queryFn: () => intelligenceApi.getRecompetePredictions(12),
+  // Fetch trend data
+  const { data: trendData, isLoading: trendLoading } = useQuery<TrendData[]>({
+    queryKey: ['trend-data', selectedTimeRange],
+    queryFn: async () => {
+      const response = await fetch(`/api/dashboard/trends?range=${selectedTimeRange}`);
+      if (!response.ok) throw new Error('Failed to fetch trends');
+      return response.json();
+    },
   });
 
-  // Mock data for charts
-  const trendData = [
-    { name: 'Jan', opportunities: 245, contracts: 120, value: 45000000 },
-    { name: 'Feb', opportunities: 312, contracts: 145, value: 52000000 },
-    { name: 'Mar', opportunities: 289, contracts: 132, value: 48000000 },
-    { name: 'Apr', opportunities: 378, contracts: 168, value: 61000000 },
-    { name: 'May', opportunities: 423, contracts: 189, value: 72000000 },
-    { name: 'Jun', opportunities: 456, contracts: 201, value: 78000000 },
+  // Fetch source breakdown
+  const { data: sourceData, isLoading: sourceLoading } = useQuery<SourceData[]>({
+    queryKey: ['source-breakdown'],
+    queryFn: async () => {
+      const response = await fetch('/api/dashboard/sources');
+      if (!response.ok) throw new Error('Failed to fetch source data');
+      return response.json();
+    },
+  });
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    const unsubscribeNew = subscribe('new_opportunity', (data) => {
+      setLiveCount(prev => prev + 1);
+      refetchStats();
+      refetchOpportunities();
+    });
+
+    const unsubscribeUpdate = subscribe('opportunity_update', () => {
+      refetchStats();
+      refetchOpportunities();
+    });
+
+    return () => {
+      unsubscribeNew();
+      unsubscribeUpdate();
+    };
+  }, [subscribe, refetchStats, refetchOpportunities]);
+
+  const timeRanges = [
+    { value: '1d', label: '24h' },
+    { value: '7d', label: '7d' },
+    { value: '30d', label: '30d' },
+    { value: '90d', label: '90d' },
   ];
 
-  const sourceDistribution = [
-    { name: 'SAM.gov', value: 45, color: '#3b82f6' },
-    { name: 'Grants.gov', value: 20, color: '#10b981' },
-    { name: 'TED EU', value: 15, color: '#f59e0b' },
-    { name: 'UK Contracts', value: 12, color: '#8b5cf6' },
-    { name: 'UNGM', value: 8, color: '#ef4444' },
+  const mockTrendData = [
+    { date: '2024-01', opportunities: 45, value: 12500000 },
+    { date: '2024-02', opportunities: 52, value: 15200000 },
+    { date: '2024-03', opportunities: 48, value: 13800000 },
+    { date: '2024-04', opportunities: 61, value: 18900000 },
+    { date: '2024-05', opportunities: 57, value: 16700000 },
+    { date: '2024-06', opportunities: 73, value: 21400000 },
+    { date: '2024-07', opportunities: 69, value: 19800000 },
   ];
 
-  const stats = [
-    {
-      name: 'Active Opportunities',
-      value: '1,234',
-      change: '+12.3%',
-      trend: 'up',
-      icon: FileText,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
-    },
-    {
-      name: 'Total Contract Value',
-      value: '$458M',
-      change: '+8.7%',
-      trend: 'up',
-      icon: DollarSign,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
-    },
-    {
-      name: 'Expiring Contracts',
-      value: '87',
-      change: '18 this month',
-      trend: 'neutral',
-      icon: Calendar,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
-    },
-    {
-      name: 'Win Probability',
-      value: '68%',
-      change: '+5.2%',
-      trend: 'up',
-      icon: Target,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
-    },
+  const mockSourceData = [
+    { name: 'SAM.gov', count: 1247, value: 45600000, color: '#3B82F6' },
+    { name: 'Grants.gov', count: 892, value: 28900000, color: '#10B981' },
+    { name: 'TED EU', count: 654, value: 19400000, color: '#F59E0B' },
+    { name: 'UK Contracts', count: 423, value: 12800000, color: '#8B5CF6' },
+    { name: 'FPDS', count: 789, value: 34200000, color: '#EF4444' },
+    { name: 'UN Global', count: 321, value: 8900000, color: '#06B6D4' },
   ];
+
+  // Mock stats data
+  const mockStats = {
+    total: 4326,
+    active: 2847,
+    new_today: 127,
+    closing_soon: 384,
+    total_value: 2400000000,
+    sources_active: 6,
+    avg_response_time: 45
+  };
+
+  const mockRecentOpportunities = [
+    {
+      id: '1',
+      title: 'Cloud Infrastructure Modernization Services',
+      agency: 'Department of Defense',
+      status: 'active',
+      deadline: '2024-09-15',
+      value: 25000000,
+      source: 'SAM.gov',
+      naics_codes: ['541511', '541512']
+    },
+    {
+      id: '2', 
+      title: 'AI-Powered Data Analytics Platform',
+      agency: 'Department of Veterans Affairs',
+      status: 'active',
+      deadline: '2024-08-28',
+      value: 15000000,
+      source: 'Grants.gov',
+      naics_codes: ['541511']
+    },
+    {
+      id: '3',
+      title: 'Cybersecurity Assessment and Implementation',
+      agency: 'General Services Administration',
+      status: 'active',
+      deadline: '2024-09-30',
+      value: 8500000,
+      source: 'FPDS',
+      naics_codes: ['541512']
+    },
+    {
+      id: '4',
+      title: 'Green Energy Infrastructure Development',
+      agency: 'Department of Energy',
+      status: 'active',
+      deadline: '2024-10-15',
+      value: 45000000,
+      source: 'SAM.gov',
+      naics_codes: ['237130']
+    },
+    {
+      id: '5',
+      title: 'Medical Equipment Procurement and Support',
+      agency: 'Department of Health and Human Services',
+      status: 'closing_soon',
+      deadline: '2024-08-20',
+      value: 12000000,
+      source: 'Grants.gov',
+      naics_codes: ['334510']
+    }
+  ];
+
+  const displayStats = stats || mockStats;
+  const displayOpportunities = recentOpportunities || mockRecentOpportunities;
+
+  if (statsLoading || opportunitiesLoading) {
+    return (
+      <div className=\"min-h-screen flex items-center justify-center\">
+        <div className=\"text-center\">
+          <div className=\"spinner mx-auto mb-4\" />
+          <p className=\"text-white/70\">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-2 text-gray-600">
-          Welcome back! Here's your procurement intelligence overview.
-        </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.name} className="card p-6">
-              <div className="flex items-center">
-                <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                  <Icon className={`h-6 w-6 ${stat.color}`} />
+    <div className=\"min-h-screen py-8\">
+      <div className=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8\">
+        {/* Header with real-time indicator */}
+        <div className=\"mb-8\">
+          <div className=\"flex items-center justify-between\">
+            <div>
+              <h1 className=\"text-4xl font-bold text-white mb-2 animate-slide-up\">
+                Procurement Intelligence
+              </h1>
+              <p className=\"text-white/70 text-lg\">
+                Real-time insights across 6 global procurement platforms
+              </p>
+            </div>
+            <div className=\"flex items-center space-x-4\">
+              {liveCount > 0 && (
+                <div className=\"glass rounded-lg px-4 py-2 animate-pulse\">
+                  <div className=\"flex items-center space-x-2\">
+                    <div className=\"h-2 w-2 bg-green-400 rounded-full animate-pulse\" />
+                    <span className=\"text-white text-sm font-medium\">+{liveCount} new</span>
+                  </div>
                 </div>
-                <div className="ml-4 flex-1">
-                  <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                  <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
-                  <p className="text-sm text-gray-500 flex items-center mt-1">
-                    {stat.trend === 'up' && <ArrowUp className="h-3 w-3 text-green-500 mr-1" />}
-                    {stat.trend === 'down' && <ArrowDown className="h-3 w-3 text-red-500 mr-1" />}
-                    {stat.change}
-                  </p>
+              )}
+              <div className=\"glass rounded-lg px-4 py-2\">
+                <div className=\"flex items-center space-x-2\">
+                  <Activity className={`h-4 w-4 ${status === 'connected' ? 'text-green-400' : 'text-yellow-400'}`} />
+                  <span className=\"text-white text-sm capitalize\">
+                    {status === 'connected' ? 'Live' : status}
+                  </span>
                 </div>
               </div>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Opportunities Trend */}
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Opportunity Trends</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Area
-                type="monotone"
-                dataKey="opportunities"
-                stroke="#3b82f6"
-                fill="#93bbfc"
-                strokeWidth={2}
-              />
-              <Area
-                type="monotone"
-                dataKey="contracts"
-                stroke="#10b981"
-                fill="#86efac"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Source Distribution */}
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Opportunities by Source</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={sourceDistribution}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={(entry) => `${entry.name}: ${entry.value}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {sourceDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Tables Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Opportunities */}
-        <div className="card">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Recent Opportunities</h3>
-              <Link to="/opportunities" className="text-sm text-primary-600 hover:text-primary-700">
-                View all →
-              </Link>
-            </div>
           </div>
-          <div className="divide-y divide-gray-200">
-            {opportunities?.data?.slice(0, 5).map((opp: any) => (
-              <Link
-                key={opp.id}
-                to={`/opportunities/${opp.id}`}
-                className="block p-4 hover:bg-gray-50 transition-colors"
+        </div>
+
+        {/* Time Range Selector */}
+        <div className=\"mb-8\">
+          <div className=\"glass rounded-xl p-1 inline-flex space-x-1\">
+            {timeRanges.map((range) => (
+              <button
+                key={range.value}
+                onClick={() => setSelectedTimeRange(range.value)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  selectedTimeRange === range.value
+                    ? 'bg-white/20 text-white shadow-lg'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 line-clamp-1">
-                      {opp.title}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">{opp.agency_name}</p>
-                    <div className="flex items-center mt-2 text-xs text-gray-500">
-                      <Clock className="h-3 w-3 mr-1" />
-                      <span>Due {format(new Date(opp.response_deadline), 'MMM dd, yyyy')}</span>
-                    </div>
-                  </div>
-                  <div className="ml-4 text-right">
-                    <p className="text-sm font-medium text-gray-900">
-                      ${(opp.estimated_value / 1000000).toFixed(1)}M
-                    </p>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        opp.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {opp.status}
-                    </span>
-                  </div>
-                </div>
-              </Link>
+                {range.label}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Expiring Contracts */}
-        <div className="card">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Expiring Contracts</h3>
-              <Link to="/contracts" className="text-sm text-primary-600 hover:text-primary-700">
-                View all →
-              </Link>
+        {/* Stats Grid */}
+        <div className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8\">
+          <div className=\"glass rounded-2xl p-6 card-hover animate-slide-up\" style={{ animationDelay: '0.1s' }}>
+            <div className=\"flex items-center justify-between\">
+              <div>
+                <p className=\"text-white/60 text-sm font-medium\">Total Opportunities</p>
+                <p className=\"text-3xl font-bold text-white mt-2\">
+                  {displayStats.total.toLocaleString()}
+                </p>
+                <div className=\"flex items-center mt-2 text-green-400\">
+                  <TrendingUp className=\"h-4 w-4 mr-1\" />
+                  <span className=\"text-sm font-medium\">+12.5%</span>
+                </div>
+              </div>
+              <div className=\"h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center\">
+                <FileText className=\"h-6 w-6 text-white\" />
+              </div>
             </div>
           </div>
-          <div className="divide-y divide-gray-200">
-            {expiringContracts?.slice(0, 5).map((contract: any) => (
-              <div key={contract.contract_id} className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">{contract.contractor_name}</p>
-                    <p className="text-sm text-gray-500 mt-1">{contract.agency_name}</p>
-                    <div className="flex items-center mt-2">
-                      <AlertCircle className="h-3 w-3 text-yellow-500 mr-1" />
-                      <span className="text-xs text-gray-500">
-                        Expires in {contract.days_until_expiry} days
-                      </span>
+
+          <div className=\"glass rounded-2xl p-6 card-hover animate-slide-up\" style={{ animationDelay: '0.2s' }}>
+            <div className=\"flex items-center justify-between\">
+              <div>
+                <p className=\"text-white/60 text-sm font-medium\">Active Now</p>
+                <p className=\"text-3xl font-bold text-white mt-2\">
+                  {displayStats.active.toLocaleString()}
+                </p>
+                <div className=\"flex items-center mt-2 text-green-400\">
+                  <Activity className=\"h-4 w-4 mr-1\" />
+                  <span className=\"text-sm font-medium\">Live</span>
+                </div>
+              </div>
+              <div className=\"h-12 w-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl flex items-center justify-center\">
+                <Zap className=\"h-6 w-6 text-white\" />
+              </div>
+            </div>
+          </div>
+
+          <div className=\"glass rounded-2xl p-6 card-hover animate-slide-up\" style={{ animationDelay: '0.3s' }}>
+            <div className=\"flex items-center justify-between\">
+              <div>
+                <p className=\"text-white/60 text-sm font-medium\">Closing Soon</p>
+                <p className=\"text-3xl font-bold text-white mt-2\">
+                  {displayStats.closing_soon.toLocaleString()}
+                </p>
+                <div className=\"flex items-center mt-2 text-yellow-400\">
+                  <Clock className=\"h-4 w-4 mr-1\" />
+                  <span className=\"text-sm font-medium\">< 7 days</span>
+                </div>
+              </div>
+              <div className=\"h-12 w-12 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center\">
+                <Clock className=\"h-6 w-6 text-white\" />
+              </div>
+            </div>
+          </div>
+
+          <div className=\"glass rounded-2xl p-6 card-hover animate-slide-up\" style={{ animationDelay: '0.4s' }}>
+            <div className=\"flex items-center justify-between\">
+              <div>
+                <p className=\"text-white/60 text-sm font-medium\">Total Value</p>
+                <p className=\"text-3xl font-bold text-white mt-2\">
+                  ${(displayStats.total_value / 1000000000).toFixed(1)}B
+                </p>
+                <div className=\"flex items-center mt-2 text-blue-400\">
+                  <DollarSign className=\"h-4 w-4 mr-1\" />
+                  <span className=\"text-sm font-medium\">USD</span>
+                </div>
+              </div>
+              <div className=\"h-12 w-12 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-xl flex items-center justify-center\">
+                <Award className=\"h-6 w-6 text-white\" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
+        <div className=\"grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8\">
+          {/* Trends Chart */}
+          <div className=\"glass rounded-2xl p-6 animate-slide-up\" style={{ animationDelay: '0.5s' }}>
+            <h3 className=\"text-xl font-bold text-white mb-6 flex items-center\">
+              <BarChart3 className=\"h-5 w-5 mr-2\" />
+              Opportunity Trends
+            </h3>
+            <div className=\"h-80\">
+              <ResponsiveContainer width=\"100%\" height=\"100%\">
+                <AreaChart data={trendData || mockTrendData}>
+                  <defs>
+                    <linearGradient id=\"colorOpportunities\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+                      <stop offset=\"5%\" stopColor=\"#3B82F6\" stopOpacity={0.8}/>
+                      <stop offset=\"95%\" stopColor=\"#3B82F6\" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray=\"3 3\" stroke=\"rgba(255,255,255,0.1)\" />
+                  <XAxis dataKey=\"date\" stroke=\"rgba(255,255,255,0.6)\" />
+                  <YAxis stroke=\"rgba(255,255,255,0.6)\" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(0,0,0,0.8)', 
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '8px',
+                      color: 'white'
+                    }} 
+                  />
+                  <Area 
+                    type=\"monotone\" 
+                    dataKey=\"opportunities\" 
+                    stroke=\"#3B82F6\" 
+                    fillOpacity={1} 
+                    fill=\"url(#colorOpportunities)\" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Sources Breakdown */}
+          <div className=\"glass rounded-2xl p-6 animate-slide-up\" style={{ animationDelay: '0.6s' }}>
+            <h3 className=\"text-xl font-bold text-white mb-6 flex items-center\">
+              <Globe className=\"h-5 w-5 mr-2\" />
+              Data Sources
+            </h3>
+            <div className=\"h-80\">
+              <ResponsiveContainer width=\"100%\" height=\"100%\">
+                <PieChart>
+                  <Pie
+                    data={sourceData || mockSourceData}
+                    cx=\"50%\"
+                    cy=\"50%\"
+                    innerRadius={60}
+                    outerRadius={120}
+                    paddingAngle={2}
+                    dataKey=\"count\"
+                  >
+                    {(sourceData || mockSourceData).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(0,0,0,0.8)', 
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '8px',
+                      color: 'white'
+                    }} 
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className=\"mt-4 space-y-2\">
+              {(sourceData || mockSourceData).map((source) => (
+                <div key={source.name} className=\"flex items-center justify-between\">
+                  <div className=\"flex items-center space-x-2\">
+                    <div 
+                      className=\"w-3 h-3 rounded-full\" 
+                      style={{ backgroundColor: source.color }} 
+                    />
+                    <span className=\"text-white text-sm\">{source.name}</span>
+                  </div>
+                  <span className=\"text-white/70 text-sm\">{source.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Opportunities */}
+        <div className=\"glass rounded-2xl p-6 animate-slide-up\" style={{ animationDelay: '0.7s' }}>
+          <div className=\"flex items-center justify-between mb-6\">
+            <h3 className=\"text-xl font-bold text-white flex items-center\">
+              <Target className=\"h-5 w-5 mr-2\" />
+              Recent Opportunities
+            </h3>
+            <Link 
+              to=\"/search\"
+              className=\"flex items-center text-blue-400 hover:text-blue-300 transition-colors\"
+            >
+              <span className=\"text-sm font-medium mr-1\">View All</span>
+              <ArrowUpRight className=\"h-4 w-4\" />
+            </Link>
+          </div>
+          
+          <div className=\"space-y-4\">
+            {displayOpportunities.slice(0, 5).map((opportunity) => (
+              <div key={opportunity.id} className=\"glass-strong rounded-xl p-4 hover:bg-white/10 transition-all duration-200 group\">
+                <div className=\"flex items-center justify-between\">
+                  <div className=\"flex-1 min-w-0\">
+                    <div className=\"flex items-center space-x-3\">
+                      <div className=\"flex-shrink-0\">
+                        <div className={`h-3 w-3 rounded-full ${
+                          opportunity.status === 'active' ? 'bg-green-400' : 
+                          opportunity.status === 'closed' ? 'bg-red-400' : 'bg-yellow-400'
+                        }`} />
+                      </div>
+                      <div className=\"flex-1 min-w-0\">
+                        <h4 className=\"text-white font-medium text-sm group-hover:text-blue-300 transition-colors truncate\">
+                          <Link to={`/opportunity/${opportunity.id}`}>
+                            {opportunity.title}
+                          </Link>
+                        </h4>
+                        <div className=\"flex items-center space-x-4 mt-1\">
+                          <div className=\"flex items-center text-white/60 text-xs\">
+                            <Building className=\"h-3 w-3 mr-1\" />
+                            <span>{opportunity.agency}</span>
+                          </div>
+                          <div className=\"flex items-center text-white/60 text-xs\">
+                            <Globe className=\"h-3 w-3 mr-1\" />
+                            <span>{opportunity.source}</span>
+                          </div>
+                          <div className=\"flex items-center text-white/60 text-xs\">
+                            <Calendar className=\"h-3 w-3 mr-1\" />
+                            <span>{new Date(opportunity.deadline).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="ml-4 text-right">
-                    <p className="text-sm font-medium text-gray-900">
-                      ${(contract.current_value / 1000000).toFixed(1)}M
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {format(new Date(contract.current_completion_date), 'MMM dd, yyyy')}
-                    </p>
+                  <div className=\"flex items-center space-x-3\">
+                    <div className=\"text-right\">
+                      <div className=\"text-white font-medium text-sm\">
+                        ${(opportunity.value / 1000000).toFixed(1)}M
+                      </div>
+                    </div>
+                    <button className=\"text-white/50 hover:text-white transition-colors\">
+                      <Eye className=\"h-4 w-4\" />
+                    </button>
                   </div>
                 </div>
               </div>

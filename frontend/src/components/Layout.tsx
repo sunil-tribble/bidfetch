@@ -1,75 +1,89 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import {
-  Home,
-  FileText,
-  Briefcase,
-  Brain,
-  Bell,
-  BarChart3,
-  Settings,
-  LogOut,
+import { useLocation } from 'react-router-dom';
+import { 
+  Search, 
+  BarChart3, 
+  Brain, 
+  Settings, 
+  Bell, 
+  User, 
   Menu,
   X,
-  Search,
-  User,
-  Globe,
+  Target,
+  FileText,
+  Activity,
+  Globe
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useWebSocket } from '../context/WebSocketContext';
+import { useNotifications } from '../context/NotificationContext';
+import NotificationPanel from './NotificationPanel';
+import SearchBar from './SearchBar';
 
-const Layout: React.FC = () => {
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { status } = useWebSocket();
+  const { notifications } = useNotifications();
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Opportunities', href: '/opportunities', icon: FileText },
-    { name: 'Contracts', href: '/contracts', icon: Briefcase },
-    { name: 'Intelligence', href: '/intelligence', icon: Brain },
-    { name: 'Watchlists', href: '/watchlists', icon: Bell },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Dashboard', href: '/', icon: Target, current: location.pathname === '/' },
+    { name: 'Search', href: '/search', icon: Search, current: location.pathname === '/search' },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3, current: location.pathname === '/analytics' },
+    { name: 'Intelligence', href: '/intelligence', icon: Brain, current: location.pathname === '/intelligence' },
+    { name: 'Settings', href: '/settings', icon: Settings, current: location.pathname === '/settings' },
   ];
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+  const getStatusColor = () => {
+    switch (status) {
+      case 'connected': return 'bg-green-500';
+      case 'connecting': return 'bg-yellow-500 animate-pulse';
+      case 'error': return 'bg-red-500';
+      default: return 'bg-gray-500';
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Mobile sidebar */}
-      <div className={`fixed inset-0 z-40 lg:hidden ${sidebarOpen ? '' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white">
-          <div className="flex h-16 items-center justify-between px-4">
-            <div className="flex items-center">
-              <Globe className="h-8 w-8 text-primary-600" />
-              <span className="ml-2 text-xl font-bold">BidFetch</span>
+      <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
+        <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-y-0 left-0 w-64 glass-strong rounded-r-xl border-r border-white/20">
+          <div className="flex h-16 items-center justify-between px-6">
+            <div className="flex items-center space-x-2">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <Target className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-white">BidFetch</span>
             </div>
-            <button onClick={() => setSidebarOpen(false)}>
-              <X className="h-6 w-6" />
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="text-white hover:bg-white/10 rounded-lg p-1"
+            >
+              <X className="h-5 w-5" />
             </button>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
+          <nav className="px-3 mt-6">
             {navigation.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.href;
               return (
-                <Link
+                <a
                   key={item.name}
-                  to={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                    isActive
-                      ? 'bg-primary-100 text-primary-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-lg mb-1 transition-all duration-200 ${
+                    item.current
+                      ? 'bg-white/20 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  <Icon className={`mr-3 h-5 w-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                  <Icon className="mr-3 h-5 w-5" />
                   {item.name}
-                </Link>
+                </a>
               );
             })}
           </nav>
@@ -78,39 +92,63 @@ const Layout: React.FC = () => {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex min-h-0 flex-1 flex-col bg-white border-r border-gray-200">
-          <div className="flex h-16 items-center px-4 border-b border-gray-200">
-            <Globe className="h-8 w-8 text-primary-600" />
-            <span className="ml-2 text-xl font-bold">BidFetch</span>
+        <div className="glass-strong border-r border-white/20 backdrop-blur-xl">
+          {/* Logo */}
+          <div className="flex h-16 items-center px-6">
+            <div className="flex items-center space-x-3">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center animate-pulse-slow">
+                <Target className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-white gradient-text">BidFetch</span>
+            </div>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
+
+          {/* Status indicator */}
+          <div className="px-6 pb-4">
+            <div className="flex items-center space-x-2 text-sm text-white/70">
+              <div className={`h-2 w-2 rounded-full ${getStatusColor()}`} />
+              <span className="capitalize">{status === 'connected' ? 'Live Data' : status}</span>
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-3 space-y-1">
             {navigation.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname.startsWith(item.href);
               return (
-                <Link
+                <a
                   key={item.name}
-                  to={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? 'bg-primary-100 text-primary-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  href={item.href}
+                  className={`group flex items-center px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                    item.current
+                      ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  <Icon className={`mr-3 h-5 w-5 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                  <Icon className={`mr-3 h-5 w-5 transition-colors duration-200 ${
+                    item.current ? 'text-white' : 'text-white/50 group-hover:text-white/70'
+                  }`} />
                   {item.name}
-                </Link>
+                  {item.current && (
+                    <div className="ml-auto h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+                  )}
+                </a>
               );
             })}
           </nav>
-          <div className="border-t border-gray-200 p-4">
-            <button
-              onClick={handleLogout}
-              className="group flex w-full items-center px-2 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900"
-            >
-              <LogOut className="mr-3 h-5 w-5 text-gray-400" />
-              Logout
-            </button>
+
+          {/* Footer */}
+          <div className="p-6">
+            <div className="glass rounded-lg p-3 text-center">
+              <div className="flex items-center justify-center space-x-2 text-white/70 text-xs">
+                <Globe className="h-4 w-4" />
+                <span>6 Data Sources Active</span>
+              </div>
+              <div className="flex items-center justify-center space-x-2 text-white/50 text-xs mt-1">
+                <Activity className="h-3 w-3" />
+                <span>Real-time Monitoring</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -118,57 +156,57 @@ const Layout: React.FC = () => {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <div className="sticky top-0 z-10 flex h-16 bg-white border-b border-gray-200">
-          <button
-            type="button"
-            className="px-4 text-gray-500 focus:outline-none lg:hidden"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-          
-          <div className="flex flex-1 items-center justify-between px-4">
-            <div className="flex flex-1 items-center">
-              <div className="w-full max-w-lg">
-                <label htmlFor="search" className="sr-only">
-                  Search
-                </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Search className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="search"
-                    name="search"
-                    className="block w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                    placeholder="Search opportunities..."
-                    type="search"
-                  />
-                </div>
-              </div>
+        <div className="glass-strong sticky top-0 z-40 backdrop-blur-xl border-b border-white/10">
+          <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden text-white hover:bg-white/10 rounded-lg p-2 transition-colors"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            {/* Search bar */}
+            <div className="flex-1 max-w-2xl mx-4">
+              <SearchBar />
             </div>
-            
-            <div className="ml-4 flex items-center space-x-4">
-              <button className="relative p-1 text-gray-400 hover:text-gray-500">
-                <Bell className="h-6 w-6" />
-                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white" />
-              </button>
-              
-              <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
-                  <User className="h-5 w-5 text-white" />
-                </div>
-                <span className="ml-2 text-sm font-medium text-gray-700">
-                  {user?.name || 'User'}
-                </span>
+
+            {/* Right side buttons */}
+            <div className="flex items-center space-x-3">
+              {/* Notifications */}
+              <div className="relative">
+                <button
+                  onClick={() => setNotificationsOpen(!notificationsOpen)}
+                  className="text-white hover:bg-white/10 rounded-lg p-2 transition-colors relative"
+                >
+                  <Bell className="h-5 w-5" />
+                  {notifications.length > 0 && (
+                    <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center">
+                      <span className="text-xs text-white font-medium">
+                        {notifications.length > 9 ? '9+' : notifications.length}
+                      </span>
+                    </div>
+                  )}
+                </button>
+                
+                {notificationsOpen && (
+                  <NotificationPanel onClose={() => setNotificationsOpen(false)} />
+                )}
               </div>
+
+              {/* User menu */}
+              <button className="text-white hover:bg-white/10 rounded-lg p-2 transition-colors">
+                <User className="h-5 w-5" />
+              </button>
             </div>
           </div>
         </div>
 
         {/* Page content */}
-        <main className="flex-1">
-          <Outlet />
+        <main className="min-h-screen">
+          <div className="animate-slide-up">
+            {children}
+          </div>
         </main>
       </div>
     </div>

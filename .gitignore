@@ -1,0 +1,101 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+*.test.js
+*.spec.js
+
+# Production
+dist/
+build/
+frontend/dist/
+frontend/build/
+*.tar.gz
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.pid
+*.seed
+*.pid.lock
+
+# Cache
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.vuepress/dist/
+.serverless/
+.fusebox/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Docker
+Dockerfile.working
+Dockerfile.production
+
+# Kubernetes
+k8s-*.yaml
+*.yaml
+!app.yaml
+!.github/workflows/*.yaml
+
+# Deployment scripts (keep only essentials)
+deploy-*.sh
+!deploy.sh
+
+# Test/Demo files
+demo-*.js
+test-*.js
+src/simple-server.js
+src/working-server.js
+src/real-data-fetch.js
+src/index-minimal.ts
+src/index-minimal.js
+*-minimal.*
+
+# Documentation (keep only essential)
+WORKING_SYSTEM_SUMMARY.md
+
+# SSH Keys
+*.pem
+*.key
+bidfetch_rsa*
+
+# PM2
+.pm2/
+pm2.json
+ecosystem.config.js

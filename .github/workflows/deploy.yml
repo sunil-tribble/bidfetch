@@ -1,84 +1,17 @@
-name: Deploy to DigitalOcean
+name: Deploy to Production
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-env:
-  REGISTRY: registry.digitalocean.com
-  IMAGE_NAME: bidfetch-api
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    
-    - name: Use Node.js
+    - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Run tests
-      run: npm test
-      
-    - name: Build TypeScript
-      run: npm run build
-
-  build-and-push:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install doctl
-      uses: digitalocean/action-doctl@v2
-      with:
-        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-        
-    - name: Build container image
-      run: docker build -t ${{ env.REGISTRY }}/${{ secrets.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:latest -f Dockerfile.prod .
-      
-    - name: Log in to DigitalOcean Container Registry
-      run: doctl registry login --expiry-seconds 1200
-      
-    - name: Push image to DigitalOcean Container Registry
-      run: docker push ${{ env.REGISTRY }}/${{ secrets.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:latest
-      
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install doctl
-      uses: digitalocean/action-doctl@v2
-      with:
-        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-        
-    - name: Save DigitalOcean kubeconfig
-      run: doctl kubernetes cluster kubeconfig save ${{ secrets.CLUSTER_NAME }}
-      
-    - name: Deploy to Kubernetes
-      run: |
-        kubectl set image deployment/bidfetch-api bidfetch-api=${{ env.REGISTRY }}/${{ secrets.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:latest -n bidfetch
-        kubectl set image deployment/bidfetch-worker bidfetch-worker=${{ env.REGISTRY }}/${{ secrets.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:latest -n bidfetch
-        kubectl rollout status deployment/bidfetch-api -n bidfetch
-        kubectl rollout status deployment/bidfetch-worker -n bidfetch
-        
-    - name: Run database migrations
-      run: |
-        kubectl run db-migrate-${{ github.sha }} \
-          --namespace=bidfetch \
-          --rm -i \
-          --image=${{ env.REGISTRY }}/${{ secrets.REGISTRY_NAME }}/${{ env.IMAGE_NAME }}:latest \
-          --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-          -- npm run db:migrate
+ENDFILE < /dev/null
